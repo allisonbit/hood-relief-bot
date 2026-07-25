@@ -1,12 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
-body { background: #070707; color: #f0f0f0; font-family: 'Inter', system-ui, sans-serif; }
-::selection { background: rgba(34,197,94,0.3); color: #fff; }
-input::placeholder, textarea::placeholder { color: rgba(240,240,240,0.28); }
+body { background: #F7F4E9; color: #1C1C14; font-family: 'Inter', system-ui, sans-serif; }
+::selection { background: rgba(196,229,56,0.4); color: #1C1C14; }
+input::placeholder, textarea::placeholder { color: rgba(28,28,20,0.38); }
 button { font-family: inherit; }
 a { text-decoration: none; color: inherit; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(28,28,20,0.12); border-radius: 10px; }
