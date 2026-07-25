@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect } from "wagmi";
 import {
   Wallet, MapPin, Upload, Check, ShieldCheck, ArrowUpRight, ArrowRight,
   HeartHandshake, Users, Vote, Landmark, Sparkles, Quote, AlertCircle,
@@ -319,9 +321,8 @@ function HomeScreen({ setScreen, requests, ledger, loggedIn }) {
 
 // ─── LoginScreen ──────────────────────────────────────────────────────────────
 function LoginScreen({ setScreen, onLogin }) {
-  const [mode, setMode] = useState("signup");
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [wallet, setWallet] = useState("");
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [bio, setBio] = useState("");
@@ -329,44 +330,47 @@ function LoginScreen({ setScreen, onLogin }) {
   const w = useWidth();
   const mobile = w < 768;
 
-  function handleConnect() {
-    const wAddr = generateWallet();
-    setWallet(wAddr);
-    setWalletConnected(true);
-    toast.success("Wallet connected");
-  }
-
   function handleSubmit() {
-    if (!walletConnected) { toast.error("Connect your wallet first"); return; }
-    if (mode === "signup" && !name.trim()) { toast.error("Name is required"); return; }
-    onLogin({ name: name.trim() || "Anon", location: location.trim() || "Unknown", wallet, bio: bio.trim(), totalReceived: 0, totalDonated: 0, requests: [] });
-    toast.success(mode === "signup" ? "Profile created" : "Logged in");
+    if (!isConnected) { toast.error("Connect your wallet first"); return; }
+    if (!name.trim()) { toast.error("Name is required"); return; }
+    const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
+    onLogin({ name: name.trim(), location: location.trim() || "Unknown", wallet: shortAddr, fullAddress: address, bio: bio.trim(), totalReceived: 0, totalDonated: 0, requests: [] });
+    toast.success("Profile created");
     setScreen("profile");
   }
 
   return (
     <motion.div {...fade} style={{ maxWidth: 560, margin: "0 auto", padding: mobile ? "50px 20px 80px" : "70px 32px 100px" }}>
-      <Label center>{mode === "signup" ? "Create your profile" : "Welcome back"}</Label>
+      <Label center>{isConnected ? "Complete your profile" : "Connect your wallet"}</Label>
       <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 30 : 38, color: C.ink, margin: "16px 0 12px", letterSpacing: "-0.02em", textAlign: "center" }}>
-        {mode === "signup" ? "Set up your profile" : "Log in"}
+        {isConnected ? "Set up your profile" : "Sign in with your wallet"}
       </h1>
       <p style={{ fontFamily: SANS, color: C.inkSoft, fontSize: 15, marginBottom: 36, lineHeight: 1.6, textAlign: "center" }}>
-        A wallet connection is required so relief can reach you directly.
+        {isConnected ? "Fill in your details so the community knows who you are." : "Connect MetaMask, WalletConnect, Coinbase, or any supported wallet."}
       </p>
 
       <Card style={{ padding: mobile ? 24 : 36 }}>
-        <div style={{ display: "flex", gap: 6, marginBottom: 28, background: C.bgSoft, borderRadius: 100, padding: 5 }}>
-          <button onClick={() => setMode("signup")} style={{ flex: 1, padding: 10, borderRadius: 100, border: "none", background: mode === "signup" ? C.ink : "transparent", color: mode === "signup" ? C.bg : C.inkSoft, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: SANS }}>Sign up</button>
-          <button onClick={() => setMode("login")} style={{ flex: 1, padding: 10, borderRadius: 100, border: "none", background: mode === "login" ? C.ink : "transparent", color: mode === "login" ? C.bg : C.inkSoft, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: SANS }}>Log in</button>
-        </div>
-
-        <button onClick={handleConnect} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "16px", borderRadius: 16, border: `1.5px solid ${walletConnected ? C.lemonDeep : C.line}`, background: walletConnected ? C.lemonSoft : C.bgSoft, color: walletConnected ? C.lemonDeep : C.ink, fontWeight: 700, fontSize: 14, cursor: "pointer", marginBottom: 20, fontFamily: SANS }}>
-          {walletConnected ? <Check size={16} /> : <Wallet size={16} />}
-          {walletConnected ? `Wallet connected — ${wallet}` : "Connect wallet"}
-        </button>
-
-        {mode === "signup" && (
+        {!isConnected ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+            <ConnectButton.Custom>
+              {({ openConnectModal }) => (
+                <Btn variant="accent" full onClick={openConnectModal}>
+                  <Wallet size={16} /> Connect Wallet
+                </Btn>
+              )}
+            </ConnectButton.Custom>
+            <p style={{ fontSize: 12, color: C.inkDim, fontFamily: MONO, textAlign: "center" }}>
+              One wallet = one identity. No passwords needed.
+            </p>
+          </div>
+        ) : (
           <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "14px 20px", borderRadius: 16, border: `1.5px solid ${C.lemonDeep}`, background: C.lemonSoft, marginBottom: 24 }}>
+              <Check size={16} color={C.lemonDeep} />
+              <span style={{ fontFamily: MONO, fontSize: 13, color: C.lemonDeep, fontWeight: 700 }}>{address.slice(0, 6)}...{address.slice(-4)}</span>
+              <button onClick={() => disconnect()} style={{ background: "none", border: "none", cursor: "pointer", color: C.inkDim, fontSize: 11, fontFamily: MONO, marginLeft: 8 }}>disconnect</button>
+            </div>
+
             <FieldLabel required>Full name</FieldLabel>
             <TextInput placeholder="e.g. Marcus Ade" value={name} onChange={setName} />
             <FieldLabel>Location</FieldLabel>
@@ -375,12 +379,12 @@ function LoginScreen({ setScreen, onLogin }) {
             <div style={{ marginTop: 4 }}><Dropzone label="Upload a photo" fileName={photo} onFile={setPhoto} /></div>
             <FieldLabel>Short bio</FieldLabel>
             <TextArea placeholder="A line or two about you..." rows={2} value={bio} onChange={setBio} />
+
+            <Btn full variant="accent" onClick={handleSubmit} style={{ marginTop: 28 }}>
+              Create profile <ArrowRight size={14} />
+            </Btn>
           </>
         )}
-
-        <Btn full variant="accent" onClick={handleSubmit} style={{ marginTop: 28 }}>
-          {mode === "signup" ? "Create profile" : "Log in"} <ArrowRight size={14} />
-        </Btn>
       </Card>
     </motion.div>
   );
@@ -697,11 +701,30 @@ function LedgerScreen({ ledger }) {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   const [screen, setScreen] = useState("home");
   const [loggedIn, setLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [requests, setRequests] = useState(SEED_REQUESTS);
   const [ledger] = useState(SEED_LEDGER);
+
+  // Auto-logout when wallet disconnects
+  useEffect(() => {
+    if (!isConnected && loggedIn) {
+      setUser(null);
+      setLoggedIn(false);
+      setScreen("home");
+      toast("Wallet disconnected");
+    }
+  }, [isConnected]);
+
+  // Auto-login returning users (wallet reconnected but no profile yet → send to login)
+  useEffect(() => {
+    if (isConnected && !loggedIn && !user) {
+      // Wallet reconnected from localStorage but user hasn't completed profile
+    }
+  }, [isConnected, loggedIn]);
 
   function handleLogin(userData) {
     setUser(userData);
@@ -709,6 +732,7 @@ export default function App() {
   }
 
   function handleLogout() {
+    disconnect();
     setUser(null);
     setLoggedIn(false);
   }
