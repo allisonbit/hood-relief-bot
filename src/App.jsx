@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -6,10 +6,11 @@ import { useAccount, useDisconnect } from "wagmi";
 import {
   Wallet, MapPin, Upload, Check, ShieldCheck, ArrowUpRight, ArrowRight,
   HeartHandshake, Users, Vote, Landmark, Sparkles, Quote, AlertCircle,
-  LogOut, Plus, Copy, TrendingUp, Clock, Menu, X,
+  LogOut, Plus, Copy, TrendingUp, Clock, Menu, X, Edit3, Settings,
+  Home, FileText, BookOpen, BarChart3, Bell, ChevronDown, User,
+  DollarSign, Eye, ThumbsUp, ThumbsDown, ExternalLink, Hash,
 } from "lucide-react";
 
-// ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
   bg: "#F7F4E9", bgSoft: "#EFEAD6", card: "#FFFFFF",
   line: "rgba(28,28,20,0.12)", lineSoft: "rgba(28,28,20,0.07)",
@@ -21,9 +22,8 @@ const C = {
 const SERIF = "'Fraunces', serif";
 const SANS = "'Inter', sans-serif";
 const MONO = "'IBM Plex Mono', monospace";
-const fade = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -6 }, transition: { duration: 0.2 } };
+const fade = { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -4 }, transition: { duration: 0.15 } };
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
 const CATEGORIES = ["Medical", "Crypto Loss", "Disaster", "Job Loss", "Other"];
 const CAT_ICON = { Medical: HeartHandshake, "Crypto Loss": Landmark, Disaster: Sparkles, "Job Loss": Users, Other: Vote };
 
@@ -42,14 +42,12 @@ const SEED_LEDGER = [
 ];
 
 const TESTIMONIALS = [
-  { name: "Priya N.", quote: "I filed on a Tuesday and had an answer from the community by the weekend. It felt real the whole way through.", cat: "Medical" },
+  { name: "Priya N.", quote: "I filed on a Tuesday and had an answer from the community by the weekend.", cat: "Medical" },
   { name: "Marcus A.", quote: "Watching the vote count climb while people I'd never met decided to help me was something I didn't expect.", cat: "Crypto Loss" },
-  { name: "Femi O.", quote: "The proof upload made it easy to show exactly what happened. No one had to just take my word for it.", cat: "Disaster" },
+  { name: "Femi O.", quote: "The proof upload made it easy to show exactly what happened.", cat: "Disaster" },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function getInitials(name) { return (name || "??").split(/\s+/).filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2); }
-function generateWallet() { const h = "0123456789ABCDEFabcdef"; const p = () => Array.from({ length: 4 }, () => h[Math.floor(Math.random() * h.length)]).join(""); return `0x${p()}...${p()}`; }
 function useWidth() {
   const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => { const h = () => setW(window.innerWidth); window.addEventListener("resize", h); return () => window.removeEventListener("resize", h); }, []);
@@ -59,9 +57,9 @@ function useWidth() {
 // ─── Primitives ───────────────────────────────────────────────────────────────
 function Label({ children, center }) {
   return (
-    <div style={{ display: center ? "flex" : "inline-flex", justifyContent: center ? "center" : undefined, marginBottom: 18 }}>
-      <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: C.lemonDeep, display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 700, background: C.lemonSoft, padding: "6px 14px 6px 10px", borderRadius: 100 }}>
-        <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.lemonDeep }} />
+    <div style={{ display: center ? "flex" : "inline-flex", justifyContent: center ? "center" : undefined, marginBottom: 14 }}>
+      <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: C.lemonDeep, display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 700, background: C.lemonSoft, padding: "5px 12px 5px 9px", borderRadius: 100 }}>
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.lemonDeep }} />
         {children}
       </span>
     </div>
@@ -69,42 +67,43 @@ function Label({ children, center }) {
 }
 
 function Btn({ children, variant = "primary", onClick, style, full, type = "button", disabled, size = "md" }) {
-  const pad = size === "sm" ? "10px 20px" : size === "lg" ? "18px 36px" : "14px 28px";
-  const base = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: SANS, fontWeight: 700, fontSize: size === "sm" ? 13 : 14.5, padding: pad, borderRadius: 100, border: "none", cursor: disabled ? "not-allowed" : "pointer", transition: "all .18s ease", letterSpacing: "-0.01em", width: full ? "100%" : undefined, opacity: disabled ? 0.45 : 1 };
-  const variants = { primary: { background: C.ink, color: C.bg }, accent: { background: C.lemon, color: C.ink, boxShadow: `0 4px 0 ${C.lemonDeep}` }, ghost: { background: C.card, color: C.ink, border: `1.5px solid ${C.line}` }, danger: { background: C.redSoft, color: C.red, border: `1px solid rgba(194,73,47,0.2)` } };
+  const pad = size === "sm" ? "8px 16px" : size === "lg" ? "16px 32px" : "12px 24px";
+  const fs = size === "sm" ? 12.5 : size === "lg" ? 14.5 : 13.5;
+  const base = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, fontFamily: SANS, fontWeight: 700, fontSize: fs, padding: pad, borderRadius: 100, border: "none", cursor: disabled ? "not-allowed" : "pointer", transition: "all .18s ease", letterSpacing: "-0.01em", width: full ? "100%" : undefined, opacity: disabled ? 0.45 : 1 };
+  const variants = { primary: { background: C.ink, color: C.bg }, accent: { background: C.lemon, color: C.ink, boxShadow: `0 3px 0 ${C.lemonDeep}` }, ghost: { background: C.card, color: C.ink, border: `1.5px solid ${C.line}` }, danger: { background: C.redSoft, color: C.red, border: `1px solid rgba(194,73,47,0.2)` }, soft: { background: C.bgSoft, color: C.ink, border: "none" } };
   return <motion.button type={type} onClick={disabled ? undefined : onClick} whileHover={disabled ? {} : { scale: 1.02 }} whileTap={disabled ? {} : { scale: 0.97 }} style={{ ...base, ...variants[variant], ...style }}>{children}</motion.button>;
 }
 
 function Card({ children, style, onClick }) {
-  return <div onClick={onClick} style={{ background: C.card, borderRadius: 28, boxShadow: "0 2px 16px rgba(28,28,20,0.06)", border: `1px solid ${C.lineSoft}`, ...style }}>{children}</div>;
+  return <div onClick={onClick} style={{ background: C.card, borderRadius: 22, boxShadow: "0 1px 10px rgba(28,28,20,0.05)", border: `1px solid ${C.lineSoft}`, ...style }}>{children}</div>;
 }
 
 function CatTag({ cat }) {
   const Icon = CAT_ICON[cat] || Vote;
-  return <span style={{ fontFamily: SANS, fontSize: 11.5, fontWeight: 700, color: C.ink, display: "inline-flex", alignItems: "center", gap: 6, background: C.lemonSoft, padding: "5px 12px", borderRadius: 100 }}><Icon size={12} color={C.lemonDeep} />{cat}</span>;
+  return <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 700, color: C.ink, display: "inline-flex", alignItems: "center", gap: 5, background: C.lemonSoft, padding: "4px 10px", borderRadius: 100 }}><Icon size={11} color={C.lemonDeep} />{cat}</span>;
 }
 
 function StatusPill({ status, daysLeft }) {
   const open = status === "Open";
-  return <span style={{ fontFamily: MONO, fontSize: 11, color: open ? C.lemonDeep : C.inkSoft, fontWeight: 700, background: open ? C.lemonSoft : C.bgSoft, padding: "6px 12px", borderRadius: 100, whiteSpace: "nowrap" }}>{open ? `Open · ${daysLeft}d left` : status}</span>;
+  return <span style={{ fontFamily: MONO, fontSize: 10.5, color: open ? C.lemonDeep : C.inkSoft, fontWeight: 700, background: open ? C.lemonSoft : C.bgSoft, padding: "5px 10px", borderRadius: 100, whiteSpace: "nowrap" }}>{open ? `Open · ${daysLeft}d left` : status}</span>;
 }
 
 function Pill({ children, active, onClick }) {
-  return <button onClick={onClick} style={{ padding: "10px 18px", borderRadius: 100, cursor: "pointer", fontFamily: SANS, fontSize: 13, fontWeight: 700, background: active ? C.ink : C.card, color: active ? C.bg : C.inkSoft, border: `1.5px solid ${active ? C.ink : C.line}` }}>{children}</button>;
+  return <button onClick={onClick} style={{ padding: "8px 16px", borderRadius: 100, cursor: "pointer", fontFamily: SANS, fontSize: 12.5, fontWeight: 700, background: active ? C.ink : C.card, color: active ? C.bg : C.inkSoft, border: `1.5px solid ${active ? C.ink : C.line}`, transition: "all .15s" }}>{children}</button>;
 }
 
 function FieldLabel({ children, required }) {
-  return <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.inkSoft, marginBottom: 10, marginTop: 24, fontFamily: MONO, letterSpacing: "0.05em", textTransform: "uppercase" }}>{children}{required && <span style={{ color: C.red, marginLeft: 3 }}>*</span>}</label>;
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: C.inkSoft, marginBottom: 8, marginTop: 20, fontFamily: MONO, letterSpacing: "0.05em", textTransform: "uppercase" }}>{children}{required && <span style={{ color: C.red, marginLeft: 3 }}>*</span>}</label>;
 }
 
 function TextInput({ placeholder, prefix, value, onChange, error }) {
   return (
     <div>
       <div style={{ position: "relative" }}>
-        {prefix && <span style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", color: C.inkDim, fontSize: 14, fontFamily: MONO }}>{prefix}</span>}
-        <input placeholder={placeholder} value={value || ""} onChange={e => onChange && onChange(e.target.value)} style={{ width: "100%", border: `1.5px solid ${error ? C.red : C.line}`, borderRadius: 16, padding: prefix ? "15px 18px 15px 70px" : "15px 18px", fontFamily: MONO, fontSize: 15, color: C.ink, background: C.bgSoft, boxSizing: "border-box", outline: "none", transition: "border-color .15s" }} onFocus={e => { e.target.style.borderColor = error ? C.red : C.lemonDeep; }} onBlur={e => { e.target.style.borderColor = error ? C.red : C.line; }} />
+        {prefix && <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: C.inkDim, fontSize: 13, fontFamily: MONO }}>{prefix}</span>}
+        <input placeholder={placeholder} value={value || ""} onChange={e => onChange && onChange(e.target.value)} style={{ width: "100%", border: `1.5px solid ${error ? C.red : C.line}`, borderRadius: 14, padding: prefix ? "13px 16px 13px 56px" : "13px 16px", fontFamily: MONO, fontSize: 14, color: C.ink, background: C.bgSoft, boxSizing: "border-box", outline: "none", transition: "border-color .15s" }} onFocus={e => { e.target.style.borderColor = error ? C.red : C.lemonDeep; }} onBlur={e => { e.target.style.borderColor = error ? C.red : C.line; }} />
       </div>
-      {error && <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6, color: C.red, fontSize: 12, fontFamily: SANS }}><AlertCircle size={12} />{error}</div>}
+      {error && <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5, color: C.red, fontSize: 11.5, fontFamily: SANS }}><AlertCircle size={11} />{error}</div>}
     </div>
   );
 }
@@ -112,17 +111,17 @@ function TextInput({ placeholder, prefix, value, onChange, error }) {
 function TextArea({ placeholder, rows = 4, value, onChange, error }) {
   return (
     <div>
-      <textarea placeholder={placeholder} rows={rows} value={value || ""} onChange={e => onChange && onChange(e.target.value)} style={{ width: "100%", border: `1.5px solid ${error ? C.red : C.line}`, borderRadius: 16, padding: "16px 18px", fontFamily: SERIF, fontSize: 16.5, color: C.ink, background: C.bgSoft, boxSizing: "border-box", resize: "vertical", outline: "none", lineHeight: 1.5, transition: "border-color .15s" }} onFocus={e => { e.target.style.borderColor = error ? C.red : C.lemonDeep; }} onBlur={e => { e.target.style.borderColor = error ? C.red : C.line; }} />
-      {error && <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6, color: C.red, fontSize: 12, fontFamily: SANS }}><AlertCircle size={12} />{error}</div>}
+      <textarea placeholder={placeholder} rows={rows} value={value || ""} onChange={e => onChange && onChange(e.target.value)} style={{ width: "100%", border: `1.5px solid ${error ? C.red : C.line}`, borderRadius: 14, padding: "14px 16px", fontFamily: SERIF, fontSize: 15, color: C.ink, background: C.bgSoft, boxSizing: "border-box", resize: "vertical", outline: "none", lineHeight: 1.5, transition: "border-color .15s" }} onFocus={e => { e.target.style.borderColor = error ? C.red : C.lemonDeep; }} onBlur={e => { e.target.style.borderColor = error ? C.red : C.line; }} />
+      {error && <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5, color: C.red, fontSize: 11.5, fontFamily: SANS }}><AlertCircle size={11} />{error}</div>}
     </div>
   );
 }
 
 function Dropzone({ label, fileName, onFile }) {
   return (
-    <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, border: `2px dashed ${fileName ? C.lemonDeep : C.line}`, padding: "26px 20px", textAlign: "center", color: fileName ? C.lemonDeep : C.inkDim, fontSize: 13, cursor: "pointer", fontFamily: MONO, borderRadius: 18, background: fileName ? C.lemonSoft : C.bgSoft, transition: "all .2s" }}>
+    <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, border: `2px dashed ${fileName ? C.lemonDeep : C.line}`, padding: "22px 16px", textAlign: "center", color: fileName ? C.lemonDeep : C.inkDim, fontSize: 12.5, cursor: "pointer", fontFamily: MONO, borderRadius: 16, background: fileName ? C.lemonSoft : C.bgSoft, transition: "all .2s" }}>
       <input type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f && onFile) onFile(f.name); }} />
-      {fileName ? <><Check size={14} /> {fileName}</> : <><Upload size={14} /> {label}</>}
+      {fileName ? <><Check size={13} /> {fileName}</> : <><Upload size={13} /> {label}</>}
     </label>
   );
 }
@@ -132,327 +131,349 @@ function VoteBar({ yes, no }) {
   const yesPct = total > 0 ? Math.round((yes / total) * 100) : 0;
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11, color: C.inkDim, marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10.5, color: C.inkDim, marginBottom: 6 }}>
         <span style={{ color: C.green }}>YES {yesPct}%</span>
         <span style={{ color: C.red }}>NO {100 - yesPct}%</span>
       </div>
-      <div style={{ height: 8, background: C.bgSoft, borderRadius: 100, overflow: "hidden", display: "flex" }}>
-        <motion.div initial={{ width: 0 }} animate={{ width: `${yesPct}%` }} transition={{ duration: 0.6, ease: "easeOut" }} style={{ background: C.lemon, borderRadius: "100px 0 0 100px" }} />
-        <motion.div initial={{ width: 0 }} animate={{ width: `${100 - yesPct}%` }} transition={{ duration: 0.6, ease: "easeOut" }} style={{ background: C.red, borderRadius: "0 100px 100px 0" }} />
+      <div style={{ height: 6, background: C.bgSoft, borderRadius: 100, overflow: "hidden", display: "flex" }}>
+        <motion.div initial={{ width: 0 }} animate={{ width: `${yesPct}%` }} transition={{ duration: 0.6 }} style={{ background: C.lemon, borderRadius: "100px 0 0 100px" }} />
+        <motion.div initial={{ width: 0 }} animate={{ width: `${100 - yesPct}%` }} transition={{ duration: 0.6 }} style={{ background: C.red, borderRadius: "0 100px 100px 0" }} />
       </div>
-      <div style={{ fontFamily: MONO, fontSize: 11, color: C.inkDim, marginTop: 6 }}>{total.toLocaleString()} votes cast</div>
+      <div style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim, marginTop: 5 }}>{total.toLocaleString()} votes</div>
     </div>
   );
 }
 
-// ─── NavBar ───────────────────────────────────────────────────────────────────
-function NavBar({ screen, setScreen, loggedIn, user }) {
-  const w = useWidth();
-  const mobile = w < 700;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const links = [
-    { id: "votes", label: "Votes" },
-    { id: "ledger", label: "Ledger" },
-    { id: "categories", label: "Categories" },
-    ...(loggedIn ? [{ id: "submit", label: "Request" }] : []),
-  ];
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function Modal({ open, onClose, title, children, width = 520 }) {
+  if (!open) return null;
   return (
-    <div style={{ padding: "16px 24px 0", position: "sticky", top: 0, zIndex: 40 }}>
-      <div style={{ maxWidth: 1240, margin: "0 auto", background: C.card, borderRadius: 100, boxShadow: "0 4px 24px rgba(28,28,20,0.08)", border: `1px solid ${C.lineSoft}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 8px 8px 20px", flexWrap: "wrap", gap: 10 }}>
-        <div onClick={() => setScreen("home")} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <HeartHandshake size={15} color={C.ink} />
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(28,28,20,0.4)", backdropFilter: "blur(4px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} onClick={e => e.stopPropagation()} style={{ background: C.card, borderRadius: 24, boxShadow: "0 24px 80px rgba(28,28,20,0.2)", border: `1px solid ${C.lineSoft}`, width: "100%", maxWidth: width, maxHeight: "85vh", overflow: "auto", padding: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: `1px solid ${C.lineSoft}` }}>
+            <h2 style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 500, color: C.ink, margin: 0 }}>{title}</h2>
+            <button onClick={onClose} style={{ background: C.bgSoft, border: "none", borderRadius: 10, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.inkSoft }}><X size={16} /></button>
           </div>
-          <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 17, color: C.ink, letterSpacing: "-0.01em" }}>Hood Relief</span>
-        </div>
-        {mobile ? (
-          <button onClick={() => setMenuOpen(o => !o)} style={{ background: "none", border: "none", cursor: "pointer", color: C.inkSoft, padding: 8, borderRadius: 100 }}>
-            {menuOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        ) : (
-          <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-            {links.map(l => (
-              <button key={l.id} onClick={() => setScreen(l.id)} style={{ cursor: "pointer", color: screen === l.id ? C.ink : C.inkSoft, background: screen === l.id ? C.lemonSoft : "transparent", padding: "9px 16px", borderRadius: 100, border: "none", fontFamily: SANS, fontSize: 13.5, fontWeight: 700, transition: "all .15s" }}>{l.label}</button>
-            ))}
-            {loggedIn ? (
-              <div onClick={() => setScreen("profile")} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: "4px 14px 4px 4px", borderRadius: 100, background: screen === "profile" ? C.lemonSoft : "transparent", marginLeft: 4 }}>
-                <div style={{ width: 30, height: 30, borderRadius: "50%", background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: C.ink, fontFamily: SANS }}>{getInitials(user?.name)}</div>
-                <span style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: C.inkSoft }}>{user?.name?.split(" ")[0]}</span>
-              </div>
-            ) : (
-              <Btn onClick={() => setScreen("login")} variant="accent" size="sm" style={{ marginLeft: 6 }}>Sign up</Btn>
-            )}
-          </div>
-        )}
-      </div>
-      <AnimatePresence>
-        {mobile && menuOpen && (
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} style={{ maxWidth: 1240, margin: "8px auto 0", background: C.card, borderRadius: 24, boxShadow: "0 4px 24px rgba(28,28,20,0.08)", border: `1px solid ${C.lineSoft}`, padding: "12px 16px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {links.map(l => (
-              <button key={l.id} onClick={() => { setScreen(l.id); setMenuOpen(false); }} style={{ background: screen === l.id ? C.lemonSoft : "transparent", border: "none", borderRadius: 14, padding: "11px 16px", cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, color: screen === l.id ? C.ink : C.inkSoft, textAlign: "left" }}>{l.label}</button>
-            ))}
-            {loggedIn
-              ? <button onClick={() => { setScreen("profile"); setMenuOpen(false); }} style={{ background: "transparent", border: "none", borderRadius: 14, padding: "11px 16px", cursor: "pointer", fontFamily: SANS, fontSize: 14, fontWeight: 700, color: C.inkSoft, textAlign: "left" }}>Profile</button>
-              : <Btn onClick={() => { setScreen("login"); setMenuOpen(false); }} variant="accent" full style={{ marginTop: 6 }}>Sign up</Btn>
-            }
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+          <div style={{ padding: 24 }}>{children}</div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
-// ─── HomeScreen ───────────────────────────────────────────────────────────────
-function HomeScreen({ setScreen, requests, ledger, loggedIn }) {
+// ─── Stat Tile ────────────────────────────────────────────────────────────────
+function StatTile({ label, value, icon: Icon, accent }) {
+  return (
+    <Card style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ width: 40, height: 40, borderRadius: 12, background: accent ? C.lemonSoft : C.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon size={18} color={accent ? C.lemonDeep : C.inkSoft} />
+      </div>
+      <div>
+        <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: C.inkDim, marginBottom: 4 }}>{label}</div>
+        <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 500, color: C.ink }}>{value}</div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Landing (not logged in) ──────────────────────────────────────────────────
+function LandingPage({ onGoLogin }) {
   const w = useWidth();
   const mobile = w < 768;
-  const activeCount = requests.filter(r => r.status === "Open").length;
-  const totalReleased = ledger.reduce((s, r) => s + r.amount, 0);
-
   return (
-    <motion.div {...fade}>
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      <div style={{ padding: "16px 24px 0", position: "sticky", top: 0, zIndex: 40 }}>
+        <div style={{ maxWidth: 1240, margin: "0 auto", background: C.card, borderRadius: 100, boxShadow: "0 4px 24px rgba(28,28,20,0.08)", border: `1px solid ${C.lineSoft}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 8px 8px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center" }}><HeartHandshake size={15} color={C.ink} /></div>
+            <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 17, color: C.ink }}>Hood Relief</span>
+          </div>
+          <Btn variant="accent" size="sm" onClick={onGoLogin}>Connect Wallet</Btn>
+        </div>
+      </div>
+
       <div style={{ maxWidth: 900, margin: "0 auto", padding: mobile ? "56px 20px 40px" : "72px 32px 50px", textAlign: "center" }}>
         <Label center>Community-funded · Robinhood Chain</Label>
-        <h1 style={{ fontFamily: SERIF, fontWeight: 500, color: C.ink, margin: "10px 0 0", fontSize: mobile ? 40 : "clamp(40px,6vw,72px)", lineHeight: 1.02, letterSpacing: "-0.03em" }}>
+        <h1 style={{ fontFamily: SERIF, fontWeight: 500, color: C.ink, margin: "10px 0 0", fontSize: mobile ? 38 : "clamp(40px,6vw,72px)", lineHeight: 1.02, letterSpacing: "-0.03em" }}>
           Whatever happened,<br /><span style={{ fontStyle: "italic", color: C.lemonDeep }}>the hood</span> shows up.
         </h1>
         <p style={{ fontFamily: SANS, fontSize: 17, lineHeight: 1.6, color: C.inkSoft, maxWidth: 520, margin: "24px auto 0" }}>
           A community relief pool for real people in real trouble — crypto losses, medical bills, disasters, job loss, anything at all.
         </p>
         <div style={{ display: "flex", gap: 14, marginTop: 32, justifyContent: "center", flexWrap: "wrap" }}>
-          <Btn variant="accent" onClick={() => setScreen(loggedIn ? "submit" : "login")} size="lg">
-            {loggedIn ? "File a request" : "Create your profile"} <ArrowRight size={16} />
-          </Btn>
-          <Btn variant="ghost" onClick={() => setScreen("votes")} size="lg">See open cases</Btn>
+          <Btn variant="accent" onClick={onGoLogin} size="lg"><Wallet size={16} /> Connect & Join</Btn>
         </div>
       </div>
 
       <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "0 20px 64px" : "0 32px 80px" }}>
         <Card style={{ padding: mobile ? 24 : 36 }}>
-          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 24, marginBottom: 28 }}>
-            {[["Pool balance", "$84,200"], ["Total released", `$${totalReleased.toLocaleString()}`], ["Open cases", String(activeCount)], ["Members", "1,842"]].map(([k, v]) => (
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 20, marginBottom: 24 }}>
+            {[["Pool balance", "$84,200"], ["Total released", "$7,250"], ["Open cases", "3"], ["Members", "1,842"]].map(([k, v]) => (
               <div key={k}>
-                <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: C.inkDim, marginBottom: 8 }}>{k}</div>
-                <div style={{ fontFamily: SERIF, fontSize: mobile ? 22 : 28, color: C.ink, fontWeight: 500 }}>{v}</div>
+                <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: C.inkDim, marginBottom: 6 }}>{k}</div>
+                <div style={{ fontFamily: SERIF, fontSize: mobile ? 20 : 26, color: C.ink, fontWeight: 500 }}>{v}</div>
               </div>
             ))}
           </div>
-          <div style={{ height: 8, background: C.bgSoft, borderRadius: 100, overflow: "hidden", marginBottom: 28 }}>
-            <motion.div initial={{ width: 0 }} animate={{ width: "64%" }} transition={{ duration: 1, delay: 0.2, ease: "easeOut" }} style={{ height: "100%", background: C.lemon, borderRadius: 100 }} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: mobile ? "repeat(3,1fr)" : "repeat(5,1fr)", gap: 10 }}>
-            {CATEGORIES.map(c => {
-              const Icon = CAT_ICON[c];
-              return (
-                <div key={c} onClick={() => setScreen("categories")} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "16px 8px", borderRadius: 18, background: C.bgSoft, cursor: "pointer", textAlign: "center" }}>
-                  <Icon size={18} color={C.lemonDeep} />
-                  <span style={{ fontFamily: SANS, fontSize: 12, fontWeight: 700, color: C.ink }}>{c}</span>
-                </div>
-              );
-            })}
+          <div style={{ height: 6, background: C.bgSoft, borderRadius: 100, overflow: "hidden" }}>
+            <motion.div initial={{ width: 0 }} animate={{ width: "64%" }} transition={{ duration: 1, delay: 0.2 }} style={{ height: "100%", background: C.lemon, borderRadius: 100 }} />
           </div>
         </Card>
       </div>
 
       <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "0 20px 64px" : "0 32px 80px" }}>
         <Label>From the community</Label>
-        <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 26 : 32, color: C.ink, margin: "16px 0 28px", letterSpacing: "-0.02em" }}>People who've been through it.</h2>
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3,1fr)", gap: 18 }}>
+        <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 24 : 30, color: C.ink, margin: "12px 0 24px", letterSpacing: "-0.02em" }}>People who've been through it.</h2>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3,1fr)", gap: 16 }}>
           {TESTIMONIALS.map((t, i) => (
-            <Card key={i} style={{ padding: 26 }}>
-              <Quote size={18} color={C.lemon} style={{ marginBottom: 14 }} />
-              <p style={{ fontFamily: SERIF, fontSize: 16, color: C.ink, lineHeight: 1.55, fontStyle: "italic", marginBottom: 18 }}>{t.quote}</p>
-              <div style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: C.ink }}>{t.name}</div>
-              <div style={{ marginTop: 8 }}><CatTag cat={t.cat} /></div>
+            <Card key={i} style={{ padding: 22 }}>
+              <Quote size={16} color={C.lemon} style={{ marginBottom: 12 }} />
+              <p style={{ fontFamily: SERIF, fontSize: 15, color: C.ink, lineHeight: 1.55, fontStyle: "italic", marginBottom: 14 }}>{t.quote}</p>
+              <div style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 700, color: C.ink }}>{t.name}</div>
+              <div style={{ marginTop: 6 }}><CatTag cat={t.cat} /></div>
             </Card>
           ))}
         </div>
       </div>
 
-      <div style={{ background: C.bgSoft, padding: "72px 0" }}>
+      <div style={{ background: C.bgSoft, padding: mobile ? "56px 0" : "72px 0" }}>
         <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "0 20px" : "0 32px" }}>
           <Label>How it works</Label>
-          <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 26 : 32, color: C.ink, margin: "16px 0 32px", letterSpacing: "-0.02em" }}>Five steps. The same, every time.</h2>
-          <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8 }}>
-            {[["01", "Create a profile", "Sign up, connect your wallet, add your name, location, and photo."], ["02", "Tell your story", "Choose a category and describe what happened, in your own words."], ["03", "Attach what you have", "Upload documents, receipts, photographs — or a transaction hash."], ["04", "Community votes", "Every connected wallet gets one vote on every case."], ["05", "A person signs off", "Someone confirms the outcome and sends funds by hand."]].map(([n, title, desc]) => (
-              <Card key={n} style={{ padding: 24, minWidth: 220, flexShrink: 0 }}>
-                <div style={{ fontFamily: MONO, fontSize: 13, color: C.lemonDeep, marginBottom: 14, fontWeight: 700 }}>{n}</div>
-                <h3 style={{ fontFamily: SERIF, fontSize: 17, color: C.ink, fontWeight: 500, marginBottom: 8 }}>{title}</h3>
-                <p style={{ fontFamily: SANS, fontSize: 13, color: C.inkSoft, lineHeight: 1.55, margin: 0 }}>{desc}</p>
+          <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 24 : 30, color: C.ink, margin: "12px 0 28px" }}>Five steps. The same, every time.</h2>
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8 }}>
+            {[["01", "Connect wallet", "Sign in with MetaMask, WalletConnect, or Coinbase."], ["02", "Tell your story", "Choose a category and describe what happened."], ["03", "Attach evidence", "Upload documents, receipts, photos, or a tx hash."], ["04", "Community votes", "Every wallet gets one vote on every case."], ["05", "Manual release", "An admin confirms and sends funds by hand."]].map(([n, title, desc]) => (
+              <Card key={n} style={{ padding: 22, minWidth: 200, flexShrink: 0 }}>
+                <div style={{ fontFamily: MONO, fontSize: 12, color: C.lemonDeep, marginBottom: 12, fontWeight: 700 }}>{n}</div>
+                <h3 style={{ fontFamily: SERIF, fontSize: 16, color: C.ink, fontWeight: 500, marginBottom: 6 }}>{title}</h3>
+                <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.inkSoft, lineHeight: 1.5, margin: 0 }}>{desc}</p>
               </Card>
             ))}
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "64px 20px" : "80px 32px" }}>
-        <Card style={{ padding: mobile ? 28 : 44 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 40 }}>
-            <div style={{ flex: "1 1 320px" }}>
-              <Label>Why not automate it</Label>
-              <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 24 : 30, color: C.ink, margin: "16px 0", letterSpacing: "-0.02em" }}>A human signature is the safeguard.</h2>
-              <p style={{ fontFamily: SANS, fontSize: 15, color: C.inkSoft, lineHeight: 1.7, maxWidth: 440 }}>A contract that auto-pays on a vote is also a contract that can be exploited. Keeping a person in the loop gives the pool a real backstop.</p>
-            </div>
-            <div style={{ flex: "1 1 280px", display: "flex", flexDirection: "column", gap: 14 }}>
-              {["Every request and every vote is visible to anyone, in real time.", "The team can follow the vote outcome or hold a payout for review — never override it.", "Every completed payout is published on the public ledger."].map((t, i) => (
-                <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", background: C.bgSoft, padding: 18, borderRadius: 16 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 12, color: C.lemonDeep, fontWeight: 700, flexShrink: 0 }}>0{i + 1}</span>
-                  <p style={{ fontFamily: SANS, fontSize: 13.5, color: C.ink, lineHeight: 1.55, margin: 0 }}>{t}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "0 20px 72px" : "0 32px 90px" }}>
-        <div style={{ background: C.ink, borderRadius: 32, padding: mobile ? "48px 28px" : "70px 48px", textAlign: "center" }}>
-          <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 28 : 34, color: C.bg, marginBottom: 24, letterSpacing: "-0.02em" }}>
+      <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "56px 20px" : "80px 32px" }}>
+        <div style={{ background: C.ink, borderRadius: 28, padding: mobile ? "44px 24px" : "64px 44px", textAlign: "center" }}>
+          <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 26 : 32, color: C.bg, marginBottom: 20 }}>
             Something happened. <span style={{ fontStyle: "italic", color: C.lemon }}>Tell us.</span>
           </h2>
-          <Btn variant="accent" size="lg" onClick={() => setScreen(loggedIn ? "submit" : "login")}>
-            {loggedIn ? "File a request" : "Create your profile"} <ArrowRight size={16} />
-          </Btn>
+          <Btn variant="accent" size="lg" onClick={onGoLogin}><Wallet size={16} /> Connect & Join</Btn>
         </div>
       </div>
-    </motion.div>
+
+      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "0 32px 40px" }}>
+        <p style={{ fontSize: 11, color: C.inkDim, lineHeight: 1.7, fontFamily: MONO, textAlign: "center" }}>
+          Hood Relief Bot is a community mutual-aid pool, not a financial institution. Filing does not guarantee funding. All releases are decided by community vote and confirmed manually.
+        </p>
+      </div>
+    </div>
   );
 }
 
-// ─── LoginScreen ──────────────────────────────────────────────────────────────
-function LoginScreen({ setScreen, onLogin }) {
-  const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
-  const [name, setName] = useState("");
-  const [location, setLocation] = useState("");
-  const [bio, setBio] = useState("");
-  const [photo, setPhoto] = useState("");
-  const w = useWidth();
-  const mobile = w < 768;
+// ─── Dashboard Sidebar ────────────────────────────────────────────────────────
+function Sidebar({ tab, setTab, user, onLogout, mobile, open, onClose }) {
+  const navItems = [
+    { id: "feed", label: "Feed", icon: Home },
+    { id: "votes", label: "Vote", icon: ThumbsUp },
+    { id: "submit", label: "New Request", icon: Plus },
+    { id: "ledger", label: "Ledger", icon: BookOpen },
+    { id: "categories", label: "Categories", icon: BarChart3 },
+    { id: "profile", label: "My Profile", icon: User },
+  ];
 
-  function handleSubmit() {
-    if (!isConnected) { toast.error("Connect your wallet first"); return; }
-    if (!name.trim()) { toast.error("Name is required"); return; }
-    const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
-    onLogin({ name: name.trim(), location: location.trim() || "Unknown", wallet: shortAddr, fullAddress: address, bio: bio.trim(), totalReceived: 0, totalDonated: 0, requests: [] });
-    toast.success("Profile created");
-    setScreen("profile");
+  const sidebarContent = (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "20px 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 8px 20px", borderBottom: `1px solid ${C.lineSoft}`, marginBottom: 8 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center" }}><HeartHandshake size={14} color={C.ink} /></div>
+        <span style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 16, color: C.ink }}>Hood Relief</span>
+        {mobile && <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: C.inkSoft }}><X size={18} /></button>}
+      </div>
+
+      <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
+        {navItems.map(n => {
+          const active = tab === n.id;
+          return (
+            <button key={n.id} onClick={() => { setTab(n.id); if (mobile) onClose(); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 14, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? C.ink : C.inkSoft, background: active ? C.lemonSoft : "transparent", transition: "all .15s", textAlign: "left" }}>
+              <n.icon size={17} color={active ? C.lemonDeep : C.inkDim} />
+              {n.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div style={{ borderTop: `1px solid ${C.lineSoft}`, paddingTop: 16, marginTop: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 14, background: C.bgSoft, marginBottom: 10 }}>
+          <div style={{ width: 34, height: 34, borderRadius: "50%", background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: C.ink, fontFamily: SANS, flexShrink: 0 }}>{getInitials(user?.name)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.name}</div>
+            <div style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim }}>{user?.wallet}</div>
+          </div>
+        </div>
+        <button onClick={onLogout} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: C.red, background: "transparent", width: "100%" }}>
+          <LogOut size={15} /> Disconnect
+        </button>
+      </div>
+    </div>
+  );
+
+  if (mobile) {
+    return (
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(28,28,20,0.3)", zIndex: 50 }} />
+            <motion.div initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }} transition={{ type: "spring", damping: 25, stiffness: 300 }} style={{ position: "fixed", left: 0, top: 0, bottom: 0, width: 260, background: C.card, zIndex: 51, boxShadow: "4px 0 24px rgba(28,28,20,0.1)", borderRight: `1px solid ${C.lineSoft}` }}>
+              {sidebarContent}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    );
   }
 
   return (
-    <motion.div {...fade} style={{ maxWidth: 560, margin: "0 auto", padding: mobile ? "50px 20px 80px" : "70px 32px 100px" }}>
-      <Label center>{isConnected ? "Complete your profile" : "Connect your wallet"}</Label>
-      <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 30 : 38, color: C.ink, margin: "16px 0 12px", letterSpacing: "-0.02em", textAlign: "center" }}>
-        {isConnected ? "Set up your profile" : "Sign in with your wallet"}
-      </h1>
-      <p style={{ fontFamily: SANS, color: C.inkSoft, fontSize: 15, marginBottom: 36, lineHeight: 1.6, textAlign: "center" }}>
-        {isConnected ? "Fill in your details so the community knows who you are." : "Connect MetaMask, WalletConnect, Coinbase, or any supported wallet."}
-      </p>
-
-      <Card style={{ padding: mobile ? 24 : 36 }}>
-        {!isConnected ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-            <ConnectButton.Custom>
-              {({ openConnectModal }) => (
-                <Btn variant="accent" full onClick={openConnectModal}>
-                  <Wallet size={16} /> Connect Wallet
-                </Btn>
-              )}
-            </ConnectButton.Custom>
-            <p style={{ fontSize: 12, color: C.inkDim, fontFamily: MONO, textAlign: "center" }}>
-              One wallet = one identity. No passwords needed.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "14px 20px", borderRadius: 16, border: `1.5px solid ${C.lemonDeep}`, background: C.lemonSoft, marginBottom: 24 }}>
-              <Check size={16} color={C.lemonDeep} />
-              <span style={{ fontFamily: MONO, fontSize: 13, color: C.lemonDeep, fontWeight: 700 }}>{address.slice(0, 6)}...{address.slice(-4)}</span>
-              <button onClick={() => disconnect()} style={{ background: "none", border: "none", cursor: "pointer", color: C.inkDim, fontSize: 11, fontFamily: MONO, marginLeft: 8 }}>disconnect</button>
-            </div>
-
-            <FieldLabel required>Full name</FieldLabel>
-            <TextInput placeholder="e.g. Marcus Ade" value={name} onChange={setName} />
-            <FieldLabel>Location</FieldLabel>
-            <TextInput placeholder="City, Country" value={location} onChange={setLocation} />
-            <FieldLabel>Profile photo</FieldLabel>
-            <div style={{ marginTop: 4 }}><Dropzone label="Upload a photo" fileName={photo} onFile={setPhoto} /></div>
-            <FieldLabel>Short bio</FieldLabel>
-            <TextArea placeholder="A line or two about you..." rows={2} value={bio} onChange={setBio} />
-
-            <Btn full variant="accent" onClick={handleSubmit} style={{ marginTop: 28 }}>
-              Create profile <ArrowRight size={14} />
-            </Btn>
-          </>
-        )}
-      </Card>
-    </motion.div>
+    <div style={{ width: 240, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.lineSoft}`, position: "sticky", top: 0, height: "100vh", overflow: "auto" }}>
+      {sidebarContent}
+    </div>
   );
 }
 
-// ─── ProfileScreen ────────────────────────────────────────────────────────────
-function ProfileScreen({ user, setScreen, onLogout }) {
+// ─── Dashboard Header ─────────────────────────────────────────────────────────
+function DashHeader({ title, subtitle, onMenuOpen, mobile, children }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: mobile ? "16px 16px 12px" : "24px 28px 16px", borderBottom: `1px solid ${C.lineSoft}`, background: C.card, position: "sticky", top: 0, zIndex: 10, gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {mobile && <button onClick={onMenuOpen} style={{ background: C.bgSoft, border: "none", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.inkSoft, flexShrink: 0 }}><Menu size={18} /></button>}
+        <div>
+          <h1 style={{ fontFamily: SERIF, fontSize: mobile ? 20 : 24, fontWeight: 500, color: C.ink, margin: 0, letterSpacing: "-0.02em" }}>{title}</h1>
+          {subtitle && <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.inkSoft, margin: "2px 0 0" }}>{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── Feed Panel ───────────────────────────────────────────────────────────────
+function FeedPanel({ requests, ledger, user, setTab }) {
   const w = useWidth();
   const mobile = w < 768;
-  return (
-    <motion.div {...fade} style={{ maxWidth: 880, margin: "0 auto", padding: mobile ? "50px 20px 80px" : "70px 32px 100px" }}>
-      <Card style={{ padding: mobile ? 24 : 36, marginBottom: 24 }}>
-        <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ width: 76, height: 76, borderRadius: "50%", background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SERIF, fontSize: 26, fontWeight: 600, color: C.ink, flexShrink: 0 }}>{getInitials(user.name)}</div>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 24 : 28, color: C.ink, letterSpacing: "-0.02em" }}>{user.name}</h1>
-            <div style={{ display: "flex", gap: 18, marginTop: 8, flexWrap: "wrap", fontSize: 13, color: C.inkSoft, fontFamily: SANS }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><MapPin size={13} /> {user.location}</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: MONO }}><Wallet size={13} /> {user.wallet}</span>
-            </div>
-          </div>
-        </div>
-        {user.bio && <p style={{ color: C.inkSoft, fontSize: 14.5, lineHeight: 1.6, marginTop: 20, fontFamily: SANS }}>{user.bio}</p>}
-      </Card>
+  const activeCount = requests.filter(r => r.status === "Open").length;
+  const totalReleased = ledger.reduce((s, r) => s + r.amount, 0);
 
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 20, marginBottom: 24 }}>
-        <Card style={{ padding: 26 }}>
-          <div style={{ fontFamily: MONO, fontSize: 11, color: C.inkDim, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Total received</div>
-          <div style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 500, color: C.ink }}>${user.totalReceived.toLocaleString()}</div>
+  return (
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 900 }}>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        <StatTile label="Pool balance" value="$84,200" icon={DollarSign} accent />
+        <StatTile label="Released" value={`$${totalReleased.toLocaleString()}`} icon={TrendingUp} />
+        <StatTile label="Open cases" value={String(activeCount)} icon={Eye} />
+        <StatTile label="Members" value="1,842" icon={Users} />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <Label>Your quick actions</Label>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: 10, marginBottom: 28 }}>
+        <Card onClick={() => setTab("submit")} style={{ padding: "18px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.lemonSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={16} color={C.lemonDeep} /></div>
+          <div><div style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: C.ink }}>New Request</div><div style={{ fontFamily: SANS, fontSize: 11.5, color: C.inkDim }}>File a relief case</div></div>
         </Card>
-        <Card style={{ padding: 26 }}>
-          <div style={{ fontFamily: MONO, fontSize: 11, color: C.inkDim, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Total donated</div>
-          <div style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 500, color: C.ink }}>${user.totalDonated.toLocaleString()}</div>
+        <Card onClick={() => setTab("votes")} style={{ padding: "18px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.greenSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><ThumbsUp size={16} color={C.green} /></div>
+          <div><div style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: C.ink }}>Vote on Cases</div><div style={{ fontFamily: SANS, fontSize: 11.5, color: C.inkDim }}>{activeCount} open now</div></div>
+        </Card>
+        <Card onClick={() => setTab("ledger")} style={{ padding: "18px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.bgSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><BookOpen size={16} color={C.inkSoft} /></div>
+          <div><div style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: C.ink }}>Public Ledger</div><div style={{ fontFamily: SANS, fontSize: 11.5, color: C.inkDim }}>{ledger.length} releases</div></div>
         </Card>
       </div>
 
-      {user.requests.length > 0 && (
+      <Label>Recent cases</Label>
+      <div style={{ marginTop: 12 }}>
+        {requests.slice(0, 3).map(r => (
+          <Card key={r.id} onClick={() => setTab("votes")} style={{ padding: "16px 20px", marginBottom: 10, cursor: "pointer" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                <CatTag cat={r.category} />
+                <span style={{ fontFamily: SERIF, fontSize: 14.5, fontWeight: 500, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <span style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 500, color: C.ink }}>${r.amount.toLocaleString()}</span>
+                <StatusPill status={r.status} daysLeft={r.daysLeft} />
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Votes Panel ──────────────────────────────────────────────────────────────
+function VotesPanel({ requests, onVote }) {
+  const [filter, setFilter] = useState("All");
+  const filtered = filter === "All" ? requests : requests.filter(c => c.category === filter);
+  const w = useWidth();
+  const mobile = w < 768;
+
+  return (
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 800 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+        {["All", ...CATEGORIES].map(c => <Pill key={c} active={filter === c} onClick={() => setFilter(c)}>{c}</Pill>)}
+      </div>
+      {filtered.length === 0 && <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No cases in this category.</p>}
+      {filtered.map(c => <VoteCardDash key={c.id} c={c} onVote={onVote} />)}
+    </div>
+  );
+}
+
+function VoteCardDash({ c, onVote }) {
+  const [voted, setVoted] = useState(null);
+  const open = c.status === "Open";
+  const w = useWidth();
+  const mobile = w < 768;
+
+  return (
+    <Card style={{ padding: mobile ? 18 : 24, marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <div>
+          <CatTag cat={c.category} />
+          <h3 style={{ fontFamily: SERIF, fontSize: mobile ? 17 : 19, color: C.ink, fontWeight: 500, marginTop: 8, marginBottom: 4 }}>{c.name}</h3>
+          <div style={{ display: "flex", gap: 12, fontSize: 11.5, color: C.inkDim, fontFamily: MONO, flexWrap: "wrap" }}>
+            <span>{c.wallet}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 3 }}><MapPin size={10} />{c.location}</span>
+          </div>
+        </div>
+        <StatusPill status={c.status} daysLeft={c.daysLeft} />
+      </div>
+      <p style={{ fontFamily: SERIF, fontSize: 14.5, color: C.inkSoft, lineHeight: 1.55, fontStyle: "italic", margin: "0 0 16px" }}>"{c.story}"</p>
+      <div style={{ display: "flex", gap: mobile ? 14 : 28, marginBottom: 16, flexWrap: "wrap", background: C.bgSoft, padding: 14, borderRadius: 14 }}>
+        <div><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Requested</div><div style={{ fontFamily: SERIF, fontSize: 17, color: C.ink, fontWeight: 500 }}>${c.amount.toLocaleString()}</div></div>
+        <div><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Votes</div><div style={{ fontFamily: SERIF, fontSize: 17, color: C.ink, fontWeight: 500 }}>{c.votesCast}</div></div>
+        <div><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Evidence</div><div style={{ fontFamily: SANS, fontSize: 12.5, color: C.ink, fontWeight: 600 }}>{c.evidence}</div></div>
+      </div>
+      {open && (
         <>
-          <Label>Request history</Label>
-          <div style={{ marginTop: 16 }}>
-            {user.requests.map(r => (
-              <Card key={r.id} style={{ padding: 22, marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <CatTag cat={r.category} />
-                    <span style={{ color: C.ink, fontSize: 15, fontWeight: 600, fontFamily: SERIF }}>{r.title}</span>
-                  </div>
-                  <StatusPill status={r.status} daysLeft={r.daysLeft} />
-                </div>
-                <div style={{ display: "flex", gap: 24, marginTop: 14, fontSize: 12.5, fontFamily: MONO, color: C.inkSoft }}>
-                  <span>${r.amount.toLocaleString()} requested</span>
-                </div>
-              </Card>
-            ))}
+          <VoteBar yes={c.yesVotes} no={c.noVotes} />
+          <div style={{ marginTop: 12 }}>
+            {voted ? (
+              <div style={{ fontSize: 12.5, color: C.lemonDeep, fontFamily: MONO, fontWeight: 700 }}>Voted {voted}</div>
+            ) : (
+              <div style={{ display: "flex", gap: 10 }}>
+                <Btn variant="accent" size="sm" onClick={() => { setVoted("Yes"); onVote(c.id, "Yes"); toast.success("Voted Yes"); }}><ThumbsUp size={13} /> Yes</Btn>
+                <Btn variant="ghost" size="sm" onClick={() => { setVoted("No"); onVote(c.id, "No"); toast.success("Voted No"); }}><ThumbsDown size={13} /> No</Btn>
+              </div>
+            )}
           </div>
         </>
       )}
-
-      <div style={{ display: "flex", gap: 14, marginTop: 24, flexWrap: "wrap" }}>
-        <Btn variant="accent" onClick={() => setScreen("submit")}>File a new request <Plus size={14} /></Btn>
-        <Btn variant="ghost" onClick={() => { onLogout(); setScreen("home"); }}>Log out <LogOut size={14} /></Btn>
-      </div>
-    </motion.div>
+    </Card>
   );
 }
 
-// ─── SubmitScreen ─────────────────────────────────────────────────────────────
-function SubmitScreen({ user, onSubmit, setScreen }) {
+// ─── Submit Panel ─────────────────────────────────────────────────────────────
+function SubmitPanel({ user, onSubmit, setTab }) {
   const [cat, setCat] = useState("Crypto Loss");
   const [title, setTitle] = useState("");
   const [story, setStory] = useState("");
@@ -477,305 +498,325 @@ function SubmitScreen({ user, onSubmit, setScreen }) {
 
   function handleSubmit() {
     if (!validate()) { toast.error("Fix the errors above"); return; }
-    const req = {
-      id: Date.now(),
-      name: user.name,
-      wallet: walletAddr,
-      location: user.location,
-      category: cat,
-      title: title.trim(),
-      story: story.trim(),
-      amount: parseFloat(amount),
-      status: "Open",
-      daysLeft: 5,
-      yesVotes: 0,
-      noVotes: 0,
-      votesCast: 0,
-      evidence: evidence || "None",
-      txHash: cat === "Crypto Loss" ? txHash : null,
-    };
-    onSubmit(req);
+    onSubmit({ id: Date.now(), name: user.name, wallet: walletAddr, location: user.location, category: cat, title: title.trim(), story: story.trim(), amount: parseFloat(amount), status: "Open", daysLeft: 5, yesVotes: 0, noVotes: 0, votesCast: 0, evidence: evidence || "None", txHash: cat === "Crypto Loss" ? txHash : null });
     setSubmitted(true);
-    toast.success("Request filed successfully");
+    toast.success("Request filed");
   }
 
   if (submitted) {
     return (
-      <motion.div {...fade} style={{ maxWidth: 560, margin: "0 auto", padding: "120px 32px", textAlign: "center" }}>
-        <Card style={{ padding: 44 }}>
-          <Check size={26} color={C.lemonDeep} style={{ marginBottom: 16 }} />
-          <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 28, color: C.ink, marginBottom: 10 }}>Filed.</h1>
-          <p style={{ fontFamily: SANS, color: C.inkSoft, fontSize: 14, marginBottom: 24 }}>Your request is now open for community voting.</p>
-          <Btn variant="accent" onClick={() => setScreen("votes")}>View open cases</Btn>
+      <div style={{ padding: mobile ? 16 : 28, maxWidth: 500 }}>
+        <Card style={{ padding: 36, textAlign: "center" }}>
+          <Check size={24} color={C.lemonDeep} style={{ marginBottom: 14 }} />
+          <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 24, color: C.ink, marginBottom: 8 }}>Filed.</h2>
+          <p style={{ fontFamily: SANS, color: C.inkSoft, fontSize: 13.5, marginBottom: 20 }}>Your request is open for community voting.</p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <Btn variant="accent" size="sm" onClick={() => setTab("votes")}>View Cases</Btn>
+            <Btn variant="ghost" size="sm" onClick={() => { setSubmitted(false); setTitle(""); setStory(""); setAmount(""); setTxHash(""); setEvidence(""); }}>File Another</Btn>
+          </div>
         </Card>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div {...fade} style={{ maxWidth: 580, margin: "0 auto", padding: mobile ? "50px 20px 100px" : "70px 32px 120px" }}>
-      <Label center>File a request</Label>
-      <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 28 : 34, color: C.ink, margin: "16px 0 30px", letterSpacing: "-0.02em", textAlign: "center" }}>Put your case on the record.</h1>
-
-      <Card style={{ padding: mobile ? 24 : 34 }}>
-        <div style={{ display: "flex", gap: 10, fontSize: 12.5, color: C.inkSoft, lineHeight: 1.6, marginBottom: 26, background: C.bgSoft, padding: 16, borderRadius: 16, fontFamily: SANS }}>
-          <ShieldCheck size={16} style={{ flexShrink: 0, marginTop: 2, color: C.lemonDeep }} />
-          Filing does not guarantee funding. Every case is decided by community vote and confirmed manually.
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 560 }}>
+      <Card style={{ padding: mobile ? 20 : 28 }}>
+        <div style={{ display: "flex", gap: 8, fontSize: 12, color: C.inkSoft, lineHeight: 1.5, marginBottom: 22, background: C.bgSoft, padding: 14, borderRadius: 14, fontFamily: SANS }}>
+          <ShieldCheck size={15} style={{ flexShrink: 0, marginTop: 1, color: C.lemonDeep }} />
+          Filing does not guarantee funding. Every case is decided by community vote.
         </div>
-
         <FieldLabel required>Category</FieldLabel>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
           {CATEGORIES.map(c => <Pill key={c} active={cat === c} onClick={() => setCat(c)}>{c}</Pill>)}
         </div>
-
         <FieldLabel required>Title</FieldLabel>
         <TextInput placeholder="Short summary of your case" value={title} onChange={setTitle} error={errors.title} />
-
-        <FieldLabel required>Wallet address (for payout)</FieldLabel>
+        <FieldLabel required>Payout wallet</FieldLabel>
         <TextInput placeholder="0x..." value={walletAddr} onChange={setWalletAddr} error={errors.wallet} />
-
-        <FieldLabel required>Amount requested</FieldLabel>
+        <FieldLabel required>Amount</FieldLabel>
         <TextInput placeholder="2,500" prefix="$" value={amount} onChange={setAmount} error={errors.amount} />
-
         <FieldLabel required>What happened</FieldLabel>
-        <TextArea placeholder="Describe your situation clearly — what happened, when, and what this would help cover." value={story} onChange={setStory} error={errors.story} />
-
-        {cat === "Crypto Loss" && (
-          <>
-            <FieldLabel>Transaction hash</FieldLabel>
-            <TextInput placeholder="0x..." value={txHash} onChange={setTxHash} />
-          </>
-        )}
-
-        <FieldLabel>Supporting evidence</FieldLabel>
-        <div style={{ marginTop: 4 }}><Dropzone label="Upload photos, documents, receipts" fileName={evidence} onFile={setEvidence} /></div>
-
-        <Btn full variant="accent" onClick={handleSubmit} style={{ marginTop: 30 }}>Submit for community vote <ArrowRight size={14} /></Btn>
+        <TextArea placeholder="Describe your situation..." value={story} onChange={setStory} error={errors.story} />
+        {cat === "Crypto Loss" && (<><FieldLabel>Transaction hash</FieldLabel><TextInput placeholder="0x..." value={txHash} onChange={setTxHash} /></>)}
+        <FieldLabel>Evidence</FieldLabel>
+        <div style={{ marginTop: 4 }}><Dropzone label="Upload photos, docs, receipts" fileName={evidence} onFile={setEvidence} /></div>
+        <Btn full variant="accent" onClick={handleSubmit} style={{ marginTop: 24 }}>Submit for Vote <ArrowRight size={13} /></Btn>
       </Card>
-    </motion.div>
+    </div>
   );
 }
 
-// ─── VoteCard ─────────────────────────────────────────────────────────────────
-function VoteCard({ c, onVote, loggedIn }) {
-  const [voted, setVoted] = useState(null);
-  const open = c.status === "Open";
+// ─── Ledger Panel ─────────────────────────────────────────────────────────────
+function LedgerPanel({ ledger }) {
   const w = useWidth();
   const mobile = w < 768;
-
-  function handleVote(choice) {
-    if (!loggedIn) { toast.error("Connect a wallet to vote"); return; }
-    setVoted(choice);
-    if (onVote) onVote(c.id, choice);
-    toast.success(`Voted ${choice}`);
-  }
-
   return (
-    <Card style={{ padding: mobile ? 22 : 28, marginBottom: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, marginBottom: 18 }}>
-        <div>
-          <CatTag cat={c.category} />
-          <h3 style={{ fontFamily: SERIF, fontSize: mobile ? 18 : 21, color: C.ink, fontWeight: 500, marginTop: 10, marginBottom: 6 }}>{c.name}</h3>
-          <div style={{ display: "flex", gap: 14, fontSize: 12, color: C.inkDim, fontFamily: MONO, flexWrap: "wrap" }}>
-            <span>{c.wallet}</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><MapPin size={11} />{c.location}</span>
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 800 }}>
+      {ledger.map((r, i) => (
+        <Card key={i} style={{ padding: "16px 20px", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div>
+              <div style={{ fontFamily: MONO, fontSize: 11.5, color: C.inkSoft, marginBottom: 6 }}>{r.wallet}</div>
+              <CatTag cat={r.category} />
+            </div>
+            <div style={{ fontFamily: SERIF, fontSize: 20, color: C.ink, fontWeight: 500 }}>${r.amount.toLocaleString()}</div>
           </div>
-        </div>
-        <StatusPill status={c.status} daysLeft={c.daysLeft} />
-      </div>
-
-      <p style={{ fontFamily: SERIF, fontSize: 16, color: C.inkSoft, lineHeight: 1.6, fontStyle: "italic", margin: "0 0 22px" }}>"{c.story}"</p>
-
-      <div style={{ display: "flex", gap: mobile ? 16 : 32, marginBottom: 22, flexWrap: "wrap", background: C.bgSoft, padding: 18, borderRadius: 16 }}>
-        <div><div style={{ fontFamily: MONO, fontSize: 10, color: C.inkDim, textTransform: "uppercase", marginBottom: 6 }}>Requested</div><div style={{ fontFamily: SERIF, fontSize: 19, color: C.ink, fontWeight: 500 }}>${c.amount.toLocaleString()}</div></div>
-        <div><div style={{ fontFamily: MONO, fontSize: 10, color: C.inkDim, textTransform: "uppercase", marginBottom: 6 }}>Votes cast</div><div style={{ fontFamily: SERIF, fontSize: 19, color: C.ink, fontWeight: 500 }}>{c.votesCast}</div></div>
-        <div><div style={{ fontFamily: MONO, fontSize: 10, color: C.inkDim, textTransform: "uppercase", marginBottom: 6 }}>Evidence</div><div style={{ fontFamily: SANS, fontSize: 13.5, color: C.ink, fontWeight: 600 }}>{c.evidence}</div></div>
-      </div>
-
-      {open && (
-        <>
-          <VoteBar yes={c.yesVotes} no={c.noVotes} />
-          <div style={{ marginTop: 16 }}>
-            {voted ? (
-              <div style={{ fontSize: 13, color: C.lemonDeep, fontFamily: MONO, fontWeight: 700 }}>✓ You voted {voted}</div>
-            ) : (
-              <div style={{ display: "flex", gap: 12 }}>
-                <Btn variant="accent" onClick={() => handleVote("Yes")} size="sm">Vote Yes</Btn>
-                <Btn variant="ghost" onClick={() => handleVote("No")} size="sm">Vote No</Btn>
-              </div>
-            )}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 12, gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontFamily: SANS, fontSize: 13, color: C.inkSoft, lineHeight: 1.5, maxWidth: 420 }}>{r.note}</div>
+            <div style={{ fontFamily: MONO, fontSize: 11, color: C.inkDim, whiteSpace: "nowrap" }}>{r.date}</div>
           </div>
-        </>
-      )}
-    </Card>
+        </Card>
+      ))}
+    </div>
   );
 }
 
-// ─── VotesScreen ──────────────────────────────────────────────────────────────
-function VotesScreen({ requests, onVote, loggedIn }) {
-  const [filter, setFilter] = useState("All");
-  const filtered = filter === "All" ? requests : requests.filter(c => c.category === filter);
+// ─── Categories Panel ─────────────────────────────────────────────────────────
+function CategoriesPanel({ setTab }) {
   const w = useWidth();
   const mobile = w < 768;
-
+  const descriptions = { Medical: "Bills, treatment, and care costs.", "Crypto Loss": "Rug pulls, exploits, phishing, wallet drains.", Disaster: "Fire, flood, storm, displacement.", "Job Loss": "Bridging support after redundancy.", Other: "Anything that doesn't fit neatly." };
   return (
-    <motion.div {...fade} style={{ maxWidth: 760, margin: "0 auto", padding: mobile ? "50px 20px 80px" : "70px 32px 100px" }}>
-      <Label center>Open cases</Label>
-      <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 28 : 36, color: C.ink, margin: "16px 0 12px", letterSpacing: "-0.02em", textAlign: "center" }}>Cases awaiting the community.</h1>
-      <p style={{ color: C.inkSoft, fontSize: 14.5, marginBottom: 28, fontFamily: SANS, textAlign: "center" }}>Connect any wallet to vote. One wallet, one vote — always.</p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, justifyContent: "center" }}>
-        {["All", ...CATEGORIES].map(c => <Pill key={c} active={filter === c} onClick={() => setFilter(c)}>{c}</Pill>)}
-      </div>
-      {filtered.length === 0 && <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No cases in this category yet.</p>}
-      {filtered.map(c => <VoteCard key={c.id} c={c} onVote={onVote} loggedIn={loggedIn} />)}
-    </motion.div>
-  );
-}
-
-// ─── CategoriesScreen ─────────────────────────────────────────────────────────
-function CategoriesScreen({ setScreen }) {
-  const w = useWidth();
-  const mobile = w < 768;
-  const descriptions = {
-    "Medical": "Bills, treatment, and care costs insurance won't cover.",
-    "Crypto Loss": "Rug pulls, exploits, phishing, and wallet drains on-chain.",
-    "Disaster": "Fire, flood, storm damage, and sudden displacement.",
-    "Job Loss": "Bridging support after redundancy or sudden income loss.",
-    "Other": "Anything real that doesn't fit neatly into a category.",
-  };
-  return (
-    <motion.div {...fade} style={{ maxWidth: 800, margin: "0 auto", padding: mobile ? "50px 20px 80px" : "70px 32px 100px" }}>
-      <Label center>Categories</Label>
-      <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 28 : 36, color: C.ink, margin: "16px 0 12px", letterSpacing: "-0.02em", textAlign: "center" }}>Whatever kind of trouble it is.</h1>
-      <p style={{ color: C.inkSoft, fontSize: 14.5, marginBottom: 36, fontFamily: SANS, textAlign: "center" }}>These are starting points — the "what happened" field is always open text.</p>
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 16 }}>
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 700 }}>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 12 }}>
         {CATEGORIES.map(c => {
           const Icon = CAT_ICON[c];
           return (
-            <Card key={c} onClick={() => setScreen("submit")} style={{ padding: 24, cursor: "pointer" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-                <div style={{ width: 46, height: 46, borderRadius: 14, background: C.lemonSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Icon size={20} color={C.lemonDeep} />
-                </div>
+            <Card key={c} onClick={() => setTab("submit")} style={{ padding: 20, cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: C.lemonSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={18} color={C.lemonDeep} /></div>
                 <div style={{ flex: 1 }}>
-                  <h3 style={{ fontFamily: SERIF, fontSize: 18, color: C.ink, fontWeight: 500, marginBottom: 4 }}>{c}</h3>
-                  <p style={{ fontFamily: SANS, fontSize: 13, color: C.inkSoft, margin: 0 }}>{descriptions[c]}</p>
+                  <h3 style={{ fontFamily: SERIF, fontSize: 16, color: C.ink, fontWeight: 500, marginBottom: 3 }}>{c}</h3>
+                  <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.inkSoft, margin: 0 }}>{descriptions[c]}</p>
                 </div>
-                <ArrowRight size={16} color={C.inkDim} />
+                <ArrowRight size={14} color={C.inkDim} />
               </div>
             </Card>
           );
         })}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-// ─── LedgerScreen ─────────────────────────────────────────────────────────────
-function LedgerScreen({ ledger }) {
+// ─── Profile Panel ────────────────────────────────────────────────────────────
+function ProfilePanel({ user, setUser, requests }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(user.name);
+  const [location, setLocation] = useState(user.location);
+  const [bio, setBio] = useState(user.bio || "");
   const w = useWidth();
   const mobile = w < 768;
+  const myRequests = requests.filter(r => r.name === user.name || r.wallet === user.wallet);
+
+  function handleSave() {
+    if (!name.trim()) { toast.error("Name is required"); return; }
+    setUser(prev => ({ ...prev, name: name.trim(), location: location.trim(), bio: bio.trim() }));
+    setEditing(false);
+    toast.success("Profile updated");
+  }
+
   return (
-    <motion.div {...fade} style={{ maxWidth: 900, margin: "0 auto", padding: mobile ? "50px 20px 80px" : "70px 32px 100px" }}>
-      <Label center>Public ledger</Label>
-      <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 28 : 36, color: C.ink, margin: "16px 0 12px", letterSpacing: "-0.02em", textAlign: "center" }}>Relief already released.</h1>
-      <p style={{ color: C.inkSoft, fontSize: 14.5, marginBottom: 32, fontFamily: SANS, textAlign: "center" }}>Every entry cleared a community vote and was confirmed and paid out by hand.</p>
-      {ledger.map((r, i) => (
-        <Card key={i} style={{ padding: 22, marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
-            <div>
-              <div style={{ fontFamily: MONO, fontSize: 12.5, color: C.inkSoft, marginBottom: 8 }}>{r.wallet}</div>
-              <CatTag cat={r.category} />
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 700 }}>
+      <Card style={{ padding: mobile ? 20 : 28, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SERIF, fontSize: 22, fontWeight: 600, color: C.ink, flexShrink: 0 }}>{getInitials(user.name)}</div>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 20 : 24, color: C.ink, margin: 0 }}>{user.name}</h2>
+            <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap", fontSize: 12.5, color: C.inkSoft, fontFamily: SANS }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><MapPin size={12} />{user.location}</span>
+              <span style={{ fontFamily: MONO, display: "flex", alignItems: "center", gap: 4 }}><Wallet size={12} />{user.wallet}</span>
             </div>
-            <div style={{ fontFamily: SERIF, fontSize: 22, color: C.ink, fontWeight: 500 }}>${r.amount.toLocaleString()}</div>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 14, gap: 14, flexWrap: "wrap" }}>
-            <div style={{ fontFamily: SANS, fontSize: 13.5, color: C.inkSoft, lineHeight: 1.5, maxWidth: 460 }}>{r.note}</div>
-            <div style={{ fontFamily: MONO, fontSize: 11.5, color: C.inkDim, whiteSpace: "nowrap" }}>{r.date}</div>
+          <Btn variant="ghost" size="sm" onClick={() => setEditing(true)}><Edit3 size={13} /> Edit</Btn>
+        </div>
+        {user.bio && <p style={{ color: C.inkSoft, fontSize: 13.5, lineHeight: 1.55, marginTop: 16, fontFamily: SANS }}>{user.bio}</p>}
+      </Card>
+
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <StatTile label="Total received" value={`$${user.totalReceived.toLocaleString()}`} icon={TrendingUp} accent />
+        <StatTile label="Total donated" value={`$${user.totalDonated.toLocaleString()}`} icon={DollarSign} />
+      </div>
+
+      {myRequests.length > 0 && (
+        <>
+          <Label>My requests</Label>
+          <div style={{ marginTop: 10 }}>
+            {myRequests.map(r => (
+              <Card key={r.id} style={{ padding: "14px 18px", marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                    <CatTag cat={r.category} />
+                    <span style={{ fontFamily: SERIF, fontSize: 14, fontWeight: 500, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title || r.name}</span>
+                  </div>
+                  <StatusPill status={r.status} daysLeft={r.daysLeft} />
+                </div>
+              </Card>
+            ))}
           </div>
+        </>
+      )}
+
+      <Modal open={editing} onClose={() => setEditing(false)} title="Edit Profile">
+        <FieldLabel required>Name</FieldLabel>
+        <TextInput value={name} onChange={setName} placeholder="Your name" />
+        <FieldLabel>Location</FieldLabel>
+        <TextInput value={location} onChange={setLocation} placeholder="City, Country" />
+        <FieldLabel>Bio</FieldLabel>
+        <TextArea value={bio} onChange={setBio} placeholder="A line or two about you..." rows={3} />
+        <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+          <Btn variant="accent" onClick={handleSave}>Save Changes</Btn>
+          <Btn variant="ghost" onClick={() => setEditing(false)}>Cancel</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ─── Dashboard Shell ──────────────────────────────────────────────────────────
+function Dashboard({ user, setUser, onLogout, requests, ledger, onSubmit, onVote }) {
+  const [tab, setTab] = useState("feed");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const w = useWidth();
+  const mobile = w < 900;
+
+  const titles = { feed: "Dashboard", votes: "Vote on Cases", submit: "New Request", ledger: "Public Ledger", categories: "Categories", profile: "My Profile" };
+  const subtitles = { feed: `Welcome back, ${user?.name?.split(" ")[0]}`, votes: "One wallet, one vote — always", submit: "Put your case on the record", ledger: "Every payout confirmed by hand", categories: "Whatever kind of trouble it is", profile: "Manage your account" };
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: C.bg }}>
+      <Sidebar tab={tab} setTab={setTab} user={user} onLogout={onLogout} mobile={mobile} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <DashHeader title={titles[tab]} subtitle={subtitles[tab]} mobile={mobile} onMenuOpen={() => setSidebarOpen(true)}>
+          {tab === "feed" && <Btn variant="accent" size="sm" onClick={() => setTab("submit")}><Plus size={13} /> New Request</Btn>}
+        </DashHeader>
+        <div style={{ flex: 1, overflow: "auto" }}>
+          <AnimatePresence mode="wait">
+            <motion.div key={tab} {...fade}>
+              {tab === "feed" && <FeedPanel requests={requests} ledger={ledger} user={user} setTab={setTab} />}
+              {tab === "votes" && <VotesPanel requests={requests} onVote={onVote} />}
+              {tab === "submit" && <SubmitPanel user={user} onSubmit={onSubmit} setTab={setTab} />}
+              {tab === "ledger" && <LedgerPanel ledger={ledger} />}
+              {tab === "categories" && <CategoriesPanel setTab={setTab} />}
+              {tab === "profile" && <ProfilePanel user={user} setUser={setUser} requests={requests} />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Login Screen ─────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
+  const [bio, setBio] = useState("");
+  const [photo, setPhoto] = useState("");
+  const w = useWidth();
+  const mobile = w < 768;
+
+  function handleSubmit() {
+    if (!isConnected) { toast.error("Connect your wallet first"); return; }
+    if (!name.trim()) { toast.error("Name is required"); return; }
+    const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
+    onLogin({ name: name.trim(), location: location.trim() || "Unknown", wallet: shortAddr, fullAddress: address, bio: bio.trim(), totalReceived: 0, totalDonated: 0, requests: [] });
+    toast.success("Welcome to Hood Relief");
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <motion.div {...fade} style={{ maxWidth: 480, width: "100%" }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: C.lemon, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}><HeartHandshake size={24} color={C.ink} /></div>
+          <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 28 : 34, color: C.ink, margin: "0 0 8px", letterSpacing: "-0.02em" }}>
+            {isConnected ? "Complete your profile" : "Join Hood Relief"}
+          </h1>
+          <p style={{ fontFamily: SANS, color: C.inkSoft, fontSize: 14.5, lineHeight: 1.5 }}>
+            {isConnected ? "Fill in your details to get started." : "Connect your wallet to sign in."}
+          </p>
+        </div>
+
+        <Card style={{ padding: mobile ? 24 : 32 }}>
+          {!isConnected ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+              <ConnectButton.Custom>
+                {({ openConnectModal }) => (
+                  <Btn variant="accent" full onClick={openConnectModal} size="lg"><Wallet size={16} /> Connect Wallet</Btn>
+                )}
+              </ConnectButton.Custom>
+              <p style={{ fontSize: 11.5, color: C.inkDim, fontFamily: MONO, textAlign: "center" }}>One wallet = one identity. No passwords.</p>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 16px", borderRadius: 14, border: `1.5px solid ${C.lemonDeep}`, background: C.lemonSoft, marginBottom: 20 }}>
+                <Check size={14} color={C.lemonDeep} />
+                <span style={{ fontFamily: MONO, fontSize: 12.5, color: C.lemonDeep, fontWeight: 700 }}>{address.slice(0, 6)}...{address.slice(-4)}</span>
+                <button onClick={() => disconnect()} style={{ background: "none", border: "none", cursor: "pointer", color: C.inkDim, fontSize: 11, fontFamily: MONO, marginLeft: 6 }}>disconnect</button>
+              </div>
+              <FieldLabel required>Full name</FieldLabel>
+              <TextInput placeholder="e.g. Marcus Ade" value={name} onChange={setName} />
+              <FieldLabel>Location</FieldLabel>
+              <TextInput placeholder="City, Country" value={location} onChange={setLocation} />
+              <FieldLabel>Profile photo</FieldLabel>
+              <div style={{ marginTop: 4 }}><Dropzone label="Upload a photo" fileName={photo} onFile={setPhoto} /></div>
+              <FieldLabel>Short bio</FieldLabel>
+              <TextArea placeholder="A line or two about you..." rows={2} value={bio} onChange={setBio} />
+              <Btn full variant="accent" onClick={handleSubmit} style={{ marginTop: 24 }}>Enter Dashboard <ArrowRight size={14} /></Btn>
+            </>
+          )}
         </Card>
-      ))}
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const { disconnect } = useDisconnect();
-  const [screen, setScreen] = useState("home");
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [view, setView] = useState("landing");
   const [user, setUser] = useState(null);
   const [requests, setRequests] = useState(SEED_REQUESTS);
   const [ledger] = useState(SEED_LEDGER);
 
-  // Auto-logout when wallet disconnects
   useEffect(() => {
-    if (!isConnected && loggedIn) {
+    if (!isConnected && user) {
       setUser(null);
-      setLoggedIn(false);
-      setScreen("home");
+      setView("landing");
       toast("Wallet disconnected");
     }
   }, [isConnected]);
 
-  // Auto-login returning users (wallet reconnected but no profile yet → send to login)
-  useEffect(() => {
-    if (isConnected && !loggedIn && !user) {
-      // Wallet reconnected from localStorage but user hasn't completed profile
-    }
-  }, [isConnected, loggedIn]);
-
   function handleLogin(userData) {
     setUser(userData);
-    setLoggedIn(true);
+    setView("dashboard");
   }
 
   function handleLogout() {
     disconnect();
     setUser(null);
-    setLoggedIn(false);
+    setView("landing");
   }
 
   function handleSubmitRequest(req) {
     setRequests(prev => [req, ...prev]);
-    if (user) {
-      setUser(prev => ({ ...prev, requests: [...(prev.requests || []), req] }));
-    }
+    if (user) setUser(prev => ({ ...prev, requests: [...(prev.requests || []), req] }));
   }
 
   function handleVote(requestId, choice) {
-    setRequests(prev => prev.map(r => {
-      if (r.id === requestId) {
-        return {
-          ...r,
-          yesVotes: choice === "Yes" ? r.yesVotes + 1 : r.yesVotes,
-          noVotes: choice === "No" ? r.noVotes + 1 : r.noVotes,
-          votesCast: r.votesCast + 1,
-        };
-      }
-      return r;
-    }));
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, yesVotes: choice === "Yes" ? r.yesVotes + 1 : r.yesVotes, noVotes: choice === "No" ? r.noVotes + 1 : r.noVotes, votesCast: r.votesCast + 1 } : r));
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.ink, fontFamily: SANS }}>
+    <div style={{ fontFamily: SANS }}>
       <Toaster position="top-center" toastOptions={{ style: { fontFamily: SANS, fontSize: 13, borderRadius: 14 } }} />
-      <NavBar screen={screen} setScreen={setScreen} loggedIn={loggedIn} user={user} />
-      <AnimatePresence mode="wait">
-        {screen === "home" && <HomeScreen key="home" setScreen={setScreen} requests={requests} ledger={ledger} loggedIn={loggedIn} />}
-        {screen === "login" && <LoginScreen key="login" setScreen={setScreen} onLogin={handleLogin} />}
-        {screen === "profile" && user && <ProfileScreen key="profile" user={user} setScreen={setScreen} onLogout={handleLogout} />}
-        {screen === "submit" && <SubmitScreen key="submit" user={user || { name: "Anon", wallet: "", location: "" }} onSubmit={handleSubmitRequest} setScreen={setScreen} />}
-        {screen === "votes" && <VotesScreen key="votes" requests={requests} onVote={handleVote} loggedIn={loggedIn} />}
-        {screen === "categories" && <CategoriesScreen key="cats" setScreen={setScreen} />}
-        {screen === "ledger" && <LedgerScreen key="ledger" ledger={ledger} />}
-      </AnimatePresence>
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "0 32px 50px" }}>
-        <p style={{ fontSize: 11, color: C.inkDim, lineHeight: 1.7, fontFamily: MONO, textAlign: "center" }}>
-          Hood Relief Bot is a community mutual-aid pool, not a financial institution, insurer, or guaranteed refund service. Filing a request does not guarantee funding. All releases are decided by community vote and confirmed manually.
-        </p>
-      </div>
+      {view === "landing" && <LandingPage onGoLogin={() => setView("login")} />}
+      {view === "login" && <LoginScreen onLogin={handleLogin} />}
+      {view === "dashboard" && user && <Dashboard user={user} setUser={setUser} onLogout={handleLogout} requests={requests} ledger={ledger} onSubmit={handleSubmitRequest} onVote={handleVote} />}
     </div>
   );
 }
