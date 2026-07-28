@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  walletAddress  String   @unique
+  name           String   @default("")
+  location       String   @default("")
+  bio            String?
+  photoUrl       String?
+  totalReceived  Float    @default(0)
+  totalDonated   Float    @default(0)
+  isAdmin        Boolean  @default(false)
+  profileComplete Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  requests       Request[]
+  votes          Vote[]
+  donations      Donation[]
+  ledgerReleases LedgerEntry[] @relation("ReleasedBy")
+  adminActions   AdminActionLog[]
+}
+
+model Request {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  category        String
+  title           String
+  story           String
+  amountRequested Float
+  walletAddress   String
+  transactionHash String?
+  evidenceUrls    String   @default("[]")
+  status          String   @default("Open")
+  votingOpensAt   DateTime?
+  votingClosesAt  DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  votes           Vote[]
+  ledgerEntry     LedgerEntry?
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id])
+  voterId   String
+  voter     User     @relation(fields: [voterId], references: [id])
+  choice    String
+  createdAt DateTime @default(now())
+
+  @@unique([requestId, voterId])
+}
+
+model LedgerEntry {
+  id               String   @id @default(uuid())
+  requestId        String   @unique
+  request          Request  @relation(fields: [requestId], references: [id])
+  walletAddress    String
+  amount           Float
+  category         String
+  note             String
+  releasedAt       DateTime @default(now())
+  releasedByAdminId String
+  releasedByAdmin  User     @relation("ReleasedBy", fields: [releasedByAdminId], references: [id])
+  payoutTxHash     String?
+}
+
+model Donation {
+  id                 String   @id @default(uuid())
+  donorUserId        String?
+  donor              User?    @relation(fields: [donorUserId], references: [id])
+  donorWalletAddress String
+  amount             Float
+  txHash             String?
+  createdAt          DateTime @default(now())
+}
+
+model Nonce {
+  id            String   @id @default(uuid())
+  walletAddress String
+  nonce         String   @unique
+  message       String
+  expiresAt     DateTime
+  used          Boolean  @default(false)
+}
+
+model AdminActionLog {
+  id        String   @id @default(uuid())
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id])
+  action    String
+  requestId String?
+  reason    String?
+  createdAt DateTime @default(now())
+}
