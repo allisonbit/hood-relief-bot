@@ -12,7 +12,9 @@ const robinhoodChain = {
 
 export const config = getDefaultConfig({
   appName: 'Hood Relief Bot',
-  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // get free ID at cloud.walletconnect.com
+  // Set VITE_WALLETCONNECT_PROJECT_ID in .env.local — free ID at cloud.walletconnect.com.
+  // Injected wallets (MetaMask etc.) work without it.
+  projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || '00000000000000000000000000000000',
   chains: [robinhoodChain, base, mainnet],
   ssr: false,
 });
