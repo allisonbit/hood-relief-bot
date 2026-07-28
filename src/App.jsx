@@ -809,7 +809,7 @@ function RequestDetailModal({ c, user, onVote, onClose }) {
           <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: C.inkDim, marginBottom: 8 }}>Evidence · {c.evidenceUrls.length}</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
             {c.evidenceUrls.map((u, i) => (
-              <a key={u} href={u} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 11.5, color: C.lemonDeep, fontWeight: 700, background: C.lemonSoft, padding: "7px 12px", borderRadius: 100, textDecoration: "none" }}>
+              <a key={u} href={api.fileUrl(u)} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 11.5, color: C.lemonDeep, fontWeight: 700, background: C.lemonSoft, padding: "7px 12px", borderRadius: 100, textDecoration: "none" }}>
                 <ExternalLink size={11} /> File {i + 1}
               </a>
             ))}
@@ -1029,7 +1029,7 @@ function ProfilePanel({ user, setUser }) {
       <Card style={{ padding: mobile ? 20 : 28, marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
           {user.photoUrl
-            ? <img src={user.photoUrl} alt={user.name} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+            ? <img src={api.fileUrl(user.photoUrl)} alt={user.name} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
             : <div style={{ width: 64, height: 64, borderRadius: "50%", background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SERIF, fontSize: 22, fontWeight: 600, color: C.ink, flexShrink: 0 }}>{getInitials(user.name)}</div>}
           <div style={{ flex: 1, minWidth: 180 }}>
             <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 20 : 24, color: C.ink, margin: 0 }}>{user.name}</h2>

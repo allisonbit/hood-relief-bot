@@ -1,4 +1,16 @@
-const API = "/api";
+// Point the frontend at a hosted backend by setting VITE_API_URL
+// (e.g. https://your-backend.onrender.com). Defaults to the local dev proxy.
+const API = import.meta.env.VITE_API_URL || "/api";
+
+// Base origin for uploaded files (/uploads/...) when the API lives elsewhere.
+export function fileUrl(p) {
+  if (!p) return p;
+  try {
+    return import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).origin + p : p;
+  } catch {
+    return p;
+  }
+}
 
 function getToken() {
   return localStorage.getItem("hoodrelief_token");
@@ -21,7 +33,17 @@ async function request(path, opts = {}) {
     headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(opts.body);
   }
-  const res = await fetch(`${API}${path}`, { ...opts, headers });
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, { ...opts, headers });
+  } catch {
+    throw new Error("Cannot reach the server — check your connection and try again");
+  }
+  // A non-JSON reply means we hit a 404 page or a dead proxy, not the API.
+  const ct = res.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) {
+    throw new Error("Server unavailable — the API backend is not reachable right now");
+  }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;
