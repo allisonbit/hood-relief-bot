@@ -1,0 +1,17 @@
+{
+  "name": "Hood Relief",
+  "short_name": "Hood Relief",
+  "description": "Community-funded relief pool — crypto losses, medical bills, disasters, job loss. One wallet, one vote.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F4E9",
+  "theme_color": "#C4E538",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

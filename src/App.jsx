@@ -44,6 +44,23 @@ function shortAddr(a) { return a ? `${a.slice(0, 6)}...${a.slice(-4)}` : ""; }
 function fmtDate(d) { return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); }
 function fmtMoney(n) { return `$${Number(n || 0).toLocaleString()}`; }
 
+// Shareable deep link for a case — opens the detail view for anyone.
+function caseUrl(c) { return `${window.location.origin}/?case=${c.id}`; }
+function shareCase(c) {
+  const url = caseUrl(c);
+  const text = `Help decide: "${c.title}" — a ${fmtMoney(c.amount)} relief case on Hood Relief. One wallet, one vote.`;
+  if (navigator.share) {
+    navigator.share({ title: "Hood Relief", text, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(url);
+    toast.success("Case link copied — share it anywhere");
+  }
+}
+function xShareUrl(c) {
+  const text = `Help decide: "${c.title}" — a ${fmtMoney(c.amount)} relief case on Hood Relief.`;
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(caseUrl(c))}`;
+}
+
 // Normalize an API request (+ optional vote summary) into the shape the UI renders.
 function normalizeRequest(r, summary, fallbackUser) {
   const owner = r.user || fallbackUser || {};
@@ -220,10 +237,12 @@ function StatTile({ label, value, icon: Icon, accent }) {
 }
 
 // ─── Landing (not logged in) ──────────────────────────────────────────────────
-function LandingPage({ onGoLogin, stats }) {
+function LandingPage({ onGoLogin, stats, requests, ledger, sharedCaseId, onClearShared }) {
   const w = useWidth();
   const mobile = w < 768;
   const poolPct = stats && stats.totalDonated > 0 ? Math.round((stats.poolBalance / stats.totalDonated) * 100) : 0;
+  const openCases = (requests || []).filter(r => r.status === "Open");
+  const sharedCase = sharedCaseId ? (requests || []).find(r => r.id === sharedCaseId) : null;
   return (
     <div style={{ minHeight: "100vh", background: C.bg }}>
       <div style={{ padding: "16px 24px 0", position: "sticky", top: 0, zIndex: 40 }}>
@@ -270,6 +289,48 @@ function LandingPage({ onGoLogin, stats }) {
         </Card>
       </div>
 
+      {openCases.length > 0 && (
+        <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "0 20px 64px" : "0 32px 80px" }}>
+          <Label>Live right now</Label>
+          <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 24 : 30, color: C.ink, margin: "12px 0 24px", letterSpacing: "-0.02em" }}>Open cases the community is deciding.</h2>
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3,1fr)", gap: 16 }}>
+            {openCases.slice(0, 3).map(c => (
+              <Card key={c.id} style={{ padding: 22, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <CatTag cat={c.category} />
+                  <StatusPill status={c.status} timeLeft={c.timeLeft} />
+                </div>
+                <h3 style={{ fontFamily: SERIF, fontSize: 17, color: C.ink, fontWeight: 500, margin: 0 }}>{c.title}</h3>
+                <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.inkSoft, lineHeight: 1.5, margin: 0, flex: 1 }}>{c.story.length > 110 ? `${c.story.slice(0, 110)}…` : c.story}</p>
+                <div style={{ fontFamily: SERIF, fontSize: 20, color: C.ink, fontWeight: 500 }}>{fmtMoney(c.amount)}</div>
+                <VoteBar yes={c.yesVotes} no={c.noVotes} />
+                <Btn variant="accent" size="sm" full onClick={onGoLogin}><ThumbsUp size={13} /> Connect to vote</Btn>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {ledger.length > 0 && (
+        <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "0 20px 64px" : "0 32px 80px" }}>
+          <Label>Proof it works</Label>
+          <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: mobile ? 24 : 30, color: C.ink, margin: "12px 0 24px", letterSpacing: "-0.02em" }}>Latest releases from the pool.</h2>
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3,1fr)", gap: 16 }}>
+            {ledger.slice(0, 3).map(r => (
+              <Card key={r.id} style={{ padding: 22 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: MONO, fontSize: 11, color: C.inkDim, marginBottom: 10 }}>
+                  <span>{r.wallet}</span>
+                  <span>{r.date}</span>
+                </div>
+                <div style={{ fontFamily: SERIF, fontSize: 22, color: C.ink, fontWeight: 500, marginBottom: 8 }}>{fmtMoney(r.amount)}</div>
+                <CatTag cat={r.category} />
+                <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.inkSoft, lineHeight: 1.5, margin: "10px 0 0" }}>{r.note}</p>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ background: C.bgSoft, padding: mobile ? "56px 0" : "72px 0" }}>
         <div style={{ maxWidth: 1240, margin: "0 auto", padding: mobile ? "0 20px" : "0 32px" }}>
           <Label>How it works</Label>
@@ -300,6 +361,15 @@ function LandingPage({ onGoLogin, stats }) {
           Hood Relief Bot is a community mutual-aid pool, not a financial institution. Filing does not guarantee funding. All releases are decided by community vote and confirmed manually.
         </p>
       </div>
+
+      {sharedCase && (
+        <RequestDetailModal
+          c={sharedCase}
+          user={null}
+          onVote={async () => { onGoLogin(); throw new Error("Connect your wallet to vote"); }}
+          onClose={onClearShared}
+        />
+      )}
     </div>
   );
 }
@@ -311,6 +381,7 @@ function Sidebar({ tab, setTab, user, onLogout, mobile, open, onClose }) {
     { id: "votes", label: "Vote", icon: ThumbsUp },
     { id: "submit", label: "New Request", icon: Plus },
     { id: "donate", label: "Donate", icon: Gift },
+    { id: "community", label: "Community", icon: Users },
     { id: "ledger", label: "Ledger", icon: BookOpen },
     { id: "categories", label: "Categories", icon: BarChart3 },
     { id: "profile", label: "My Profile", icon: User },
@@ -471,10 +542,10 @@ function FeedPanel({ requests, ledger, stats, setTab }) {
 }
 
 // ─── Votes Panel ──────────────────────────────────────────────────────────────
-function VotesPanel({ requests, user, onVote }) {
+function VotesPanel({ requests, user, onVote, initialDetailId }) {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
-  const [detailId, setDetailId] = useState(null);
+  const [detailId, setDetailId] = useState(initialDetailId || null);
   const q = query.trim().toLowerCase();
   const filtered = requests
     .filter(c => filter === "All" || c.category === filter)
@@ -717,6 +788,10 @@ function RequestDetailModal({ c, user, onVote, onClose }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
         <CatTag cat={c.category} />
         <StatusPill status={c.status} timeLeft={c.timeLeft} />
+        <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
+          <Btn variant="soft" size="sm" onClick={() => shareCase(c)}><Copy size={12} /> Share</Btn>
+          <a href={xShareUrl(c)} target="_blank" rel="noreferrer"><Btn variant="soft" size="sm"><ExternalLink size={12} /> Post on X</Btn></a>
+        </span>
       </div>
       <div style={{ display: "flex", gap: 12, fontSize: 11.5, color: C.inkDim, fontFamily: MONO, flexWrap: "wrap", marginBottom: 14 }}>
         <span>{c.name}</span>
@@ -1104,15 +1179,67 @@ function AdminPanel({ onChanged }) {
   );
 }
 
+// ─── Community Panel ─────────────────────────────────────────────────────────
+function CommunityPanel({ stats, setTab }) {
+  const [board, setBoard] = useState([]);
+  const w = useWidth();
+  const mobile = w < 768;
+  const medals = ["🥇", "🥈", "🥉"];
+
+  useEffect(() => {
+    api.getLeaderboard().then(({ leaderboard }) => setBoard(leaderboard)).catch(() => {});
+  }, []);
+
+  return (
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 700 }}>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
+        <StatTile label="Members" value={stats ? stats.members.toLocaleString() : "—"} icon={Users} accent />
+        <StatTile label="Total donated" value={stats ? fmtMoney(stats.totalDonated) : "—"} icon={Gift} />
+        <StatTile label="Total released" value={stats ? fmtMoney(stats.totalReleased) : "—"} icon={TrendingUp} />
+      </div>
+
+      <Label>Top supporters</Label>
+      <div style={{ marginTop: 12 }}>
+        {board.length === 0 && (
+          <Card style={{ padding: 32, textAlign: "center" }}>
+            <Gift size={20} color={C.lemonDeep} style={{ marginBottom: 10 }} />
+            <p style={{ fontFamily: SANS, fontSize: 13.5, color: C.inkSoft, marginBottom: 14 }}>No donations yet — be the first name on this board.</p>
+            <Btn variant="accent" size="sm" onClick={() => setTab("donate")}><Gift size={13} /> Donate to the Pool</Btn>
+          </Card>
+        )}
+        {board.map((u, i) => (
+          <Card key={u.id} style={{ padding: "14px 18px", marginBottom: 8, display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 34, textAlign: "center", fontFamily: SERIF, fontSize: i < 3 ? 20 : 14, color: C.inkSoft, flexShrink: 0 }}>{i < 3 ? medals[i] : `#${i + 1}`}</div>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.lemon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: C.ink, fontFamily: SANS, flexShrink: 0 }}>{getInitials(u.name)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name || shortAddr(u.walletAddress)}</div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim }}>{shortAddr(u.walletAddress)}</div>
+            </div>
+            <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 500, color: C.lemonDeep, whiteSpace: "nowrap" }}>{fmtMoney(u.totalDonated)}</div>
+          </Card>
+        ))}
+      </div>
+
+      <div style={{ background: C.ink, borderRadius: 22, padding: "28px 24px", textAlign: "center", marginTop: 24 }}>
+        <p style={{ fontFamily: SERIF, fontSize: 17, color: C.bg, marginBottom: 14 }}>Grow the hood — <span style={{ fontStyle: "italic", color: C.lemon }}>share a case</span> or add to the pool.</p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <Btn variant="accent" size="sm" onClick={() => setTab("donate")}><Gift size={13} /> Donate</Btn>
+          <Btn variant="ghost" size="sm" onClick={() => setTab("votes")}><ThumbsUp size={13} /> Vote on Cases</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard Shell ──────────────────────────────────────────────────────────
-function Dashboard({ user, setUser, onLogout, requests, ledger, stats, onSubmitted, onVote, onDataChanged }) {
-  const [tab, setTab] = useState("feed");
+function Dashboard({ user, setUser, onLogout, requests, ledger, stats, onSubmitted, onVote, onDataChanged, initialCaseId }) {
+  const [tab, setTab] = useState(initialCaseId ? "votes" : "feed");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const w = useWidth();
   const mobile = w < 900;
 
-  const titles = { feed: "Dashboard", votes: "Vote on Cases", submit: "New Request", donate: "Donate to the Pool", ledger: "Public Ledger", categories: "Categories", profile: "My Profile", admin: "Admin — Releases" };
-  const subtitles = { feed: `Welcome back, ${user?.name?.split(" ")[0]}`, votes: "One wallet, one vote — always", submit: "Put your case on the record", donate: "Every dollar goes to someone the community voted in", ledger: "Every payout confirmed by hand", categories: "Whatever kind of trouble it is", profile: "Manage your account", admin: "Confirm and release passed cases" };
+  const titles = { feed: "Dashboard", votes: "Vote on Cases", submit: "New Request", donate: "Donate to the Pool", community: "Community", ledger: "Public Ledger", categories: "Categories", profile: "My Profile", admin: "Admin — Releases" };
+  const subtitles = { feed: `Welcome back, ${user?.name?.split(" ")[0]}`, votes: "One wallet, one vote — always", submit: "Put your case on the record", donate: "Every dollar goes to someone the community voted in", community: "The people who keep the pool alive", ledger: "Every payout confirmed by hand", categories: "Whatever kind of trouble it is", profile: "Manage your account", admin: "Confirm and release passed cases" };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg }}>
@@ -1125,9 +1252,10 @@ function Dashboard({ user, setUser, onLogout, requests, ledger, stats, onSubmitt
           <AnimatePresence mode="wait">
             <motion.div key={tab} {...fade}>
               {tab === "feed" && <FeedPanel requests={requests} ledger={ledger} stats={stats} setTab={setTab} />}
-              {tab === "votes" && <VotesPanel requests={requests} user={user} onVote={onVote} />}
+              {tab === "votes" && <VotesPanel requests={requests} user={user} onVote={onVote} initialDetailId={initialCaseId} />}
               {tab === "submit" && <SubmitPanel user={user} onSubmitted={onSubmitted} setTab={setTab} />}
               {tab === "donate" && <DonatePanel onDonated={onDataChanged} />}
+              {tab === "community" && <CommunityPanel stats={stats} setTab={setTab} />}
               {tab === "ledger" && <LedgerPanel ledger={ledger} />}
               {tab === "categories" && <CategoriesPanel setTab={setTab} />}
               {tab === "profile" && <ProfilePanel user={user} setUser={setUser} />}
@@ -1261,6 +1389,13 @@ export default function App() {
   const [ledger, setLedger] = useState([]);
   const [stats, setStats] = useState(null);
   const wasConnected = useRef(false);
+  // Deep link support: /?case=<id> opens that case for anyone.
+  const [sharedCaseId, setSharedCaseId] = useState(() => new URLSearchParams(window.location.search).get("case"));
+
+  function clearShared() {
+    setSharedCaseId(null);
+    window.history.replaceState({}, "", window.location.pathname);
+  }
 
   async function refreshRequests() {
     try {
@@ -1348,9 +1483,9 @@ export default function App() {
   return (
     <div style={{ fontFamily: SANS }}>
       <Toaster position="top-center" toastOptions={{ style: { fontFamily: SANS, fontSize: 13, borderRadius: 14 } }} />
-      {view === "landing" && <LandingPage onGoLogin={() => setView("login")} stats={stats} />}
+      {view === "landing" && <LandingPage onGoLogin={() => setView("login")} stats={stats} requests={requests} ledger={ledger} sharedCaseId={sharedCaseId} onClearShared={clearShared} />}
       {view === "login" && <LoginScreen onLogin={handleLogin} />}
-      {view === "dashboard" && user && <Dashboard user={user} setUser={setUser} onLogout={handleLogout} requests={requests} ledger={ledger} stats={stats} onSubmitted={handleSubmitted} onVote={handleVote} onDataChanged={refreshAll} />}
+      {view === "dashboard" && user && <Dashboard user={user} setUser={setUser} onLogout={handleLogout} requests={requests} ledger={ledger} stats={stats} onSubmitted={handleSubmitted} onVote={handleVote} onDataChanged={refreshAll} initialCaseId={sharedCaseId} />}
     </div>
   );
 }

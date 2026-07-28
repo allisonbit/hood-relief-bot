@@ -51,5 +51,21 @@ export default function donationRoutes(prisma) {
     }
   });
 
+  // GET /donations/leaderboard — top supporters by total donated
+  router.get("/leaderboard", async (req, res) => {
+    try {
+      const leaderboard = await prisma.user.findMany({
+        where: { totalDonated: { gt: 0 } },
+        orderBy: { totalDonated: "desc" },
+        take: 10,
+        select: { id: true, name: true, walletAddress: true, totalDonated: true, photoUrl: true },
+      });
+      res.json({ leaderboard });
+    } catch (err) {
+      console.error("leaderboard error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   return router;
 }

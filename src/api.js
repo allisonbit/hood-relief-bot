@@ -114,6 +114,10 @@ export async function getRecentDonations() {
   return request("/donations/recent");
 }
 
+export async function getLeaderboard() {
+  return request("/donations/leaderboard");
+}
+
 // Admin
 export async function getAdminRequests(status = "Passed") {
   return request(`/admin/requests?status=${status}`);
