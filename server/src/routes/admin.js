@@ -4,10 +4,94 @@ import { authenticate, attachUser, requireAdmin } from "../middleware/auth.js";
 export default function adminRoutes(prisma) {
   const router = Router();
 
-  // All admin routes require auth + admin role
+  // All admin routes require auth + the one permanent admin wallet
   router.use(authenticate);
   router.use(attachUser(prisma));
   router.use(requireAdmin);
+
+  // GET /admin/overview — full platform stats at a glance
+  router.get("/overview", async (req, res) => {
+    try {
+      const [donated, released, members, openCases, pendingReleases, totalRequests, totalVotes, totalComments, totalDonations] = await Promise.all([
+        prisma.donation.aggregate({ _sum: { amount: true } }),
+        prisma.ledgerEntry.aggregate({ _sum: { amount: true } }),
+        prisma.user.count(),
+        prisma.request.count({ where: { status: "Open" } }),
+        prisma.request.count({ where: { status: "Passed" } }),
+        prisma.request.count(),
+        prisma.vote.count(),
+        prisma.comment.count(),
+        prisma.donation.count(),
+      ]);
+      const totalDonated = donated._sum.amount || 0;
+      const totalReleased = released._sum.amount || 0;
+      res.json({
+        poolBalance: Math.max(0, totalDonated - totalReleased),
+        totalDonated,
+        totalReleased,
+        members,
+        openCases,
+        pendingReleases,
+        totalRequests,
+        totalVotes,
+        totalComments,
+        totalDonations,
+      });
+    } catch (err) {
+      console.error("admin overview error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // GET /admin/users — member directory
+  router.get("/users", async (req, res) => {
+    try {
+      const users = await prisma.user.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: {
+          id: true, walletAddress: true, name: true, location: true,
+          totalReceived: true, totalDonated: true, isAdmin: true,
+          profileComplete: true, createdAt: true,
+          _count: { select: { requests: true, votes: true } },
+        },
+      });
+      res.json({ users });
+    } catch (err) {
+      console.error("admin users error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // GET /admin/donations — full donation records
+  router.get("/donations", async (req, res) => {
+    try {
+      const donations = await prisma.donation.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: { donor: { select: { name: true } } },
+      });
+      res.json({ donations });
+    } catch (err) {
+      console.error("admin donations error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // GET /admin/logs — admin action audit trail
+  router.get("/logs", async (req, res) => {
+    try {
+      const logs = await prisma.adminActionLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: { admin: { select: { name: true, walletAddress: true } } },
+      });
+      res.json({ logs });
+    } catch (err) {
+      console.error("admin logs error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
 
   // GET /admin/requests?status=Passed — list requests awaiting release
   router.get("/requests", async (req, res) => {

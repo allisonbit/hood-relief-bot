@@ -1084,8 +1084,174 @@ function ProfilePanel({ user, setUser }) {
   );
 }
 
-// ─── Admin Panel ──────────────────────────────────────────────────────────────
-function AdminPanel({ onChanged }) {
+// ─── Admin: Overview ────────────────────────────────────────────────────────
+function AdminOverview({ setSection }) {
+  const [ov, setOv] = useState(null);
+  const w = useWidth();
+  const mobile = w < 768;
+
+  useEffect(() => {
+    api.getAdminOverview().then(setOv).catch(e => toast.error(e.message || "Failed to load overview"));
+  }, []);
+
+  if (!ov) return <p style={{ color: C.inkDim, fontFamily: SANS, fontSize: 13 }}>Loading...</p>;
+
+  return (
+    <div>
+      {ov.pendingReleases > 0 && (
+        <Card style={{ padding: "16px 20px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", border: `1.5px solid ${C.lemonDeep}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <ShieldAlert size={16} color={C.lemonDeep} />
+            <span style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: C.ink }}>{ov.pendingReleases} case{ov.pendingReleases > 1 ? "s" : ""} awaiting your release</span>
+          </div>
+          <Btn variant="accent" size="sm" onClick={() => setSection("cases")}>Review now <ArrowRight size={12} /></Btn>
+        </Card>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(3,1fr)", gap: 12 }}>
+        <StatTile label="Pool balance" value={fmtMoney(ov.poolBalance)} icon={DollarSign} accent />
+        <StatTile label="Total donated" value={fmtMoney(ov.totalDonated)} icon={Gift} />
+        <StatTile label="Total released" value={fmtMoney(ov.totalReleased)} icon={TrendingUp} />
+        <StatTile label="Members" value={String(ov.members)} icon={Users} />
+        <StatTile label="Open cases" value={String(ov.openCases)} icon={Eye} />
+        <StatTile label="Awaiting release" value={String(ov.pendingReleases)} icon={ShieldAlert} accent />
+        <StatTile label="Total requests" value={String(ov.totalRequests)} icon={BookOpen} />
+        <StatTile label="Votes cast" value={String(ov.totalVotes)} icon={ThumbsUp} />
+        <StatTile label="Comments" value={String(ov.totalComments)} icon={MessageCircle} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin: Members ─────────────────────────────────────────────────────────
+function AdminMembers() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getAdminUsers()
+      .then(({ users: u }) => setUsers(u))
+      .catch(e => toast.error(e.message || "Failed to load members"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p style={{ color: C.inkDim, fontFamily: SANS, fontSize: 13 }}>Loading...</p>;
+  if (users.length === 0) return <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No members yet.</p>;
+
+  return (
+    <div>
+      {users.map(u => (
+        <Card key={u.id} style={{ padding: "14px 18px", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: u.isAdmin ? C.ink : C.lemon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: u.isAdmin ? C.lemon : C.ink, fontFamily: SANS, flexShrink: 0 }}>{getInitials(u.name)}</div>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: C.ink }}>{u.name || "(no profile)"}</span>
+                {u.isAdmin && <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: C.lemonDeep, background: C.lemonSoft, padding: "3px 8px", borderRadius: 100 }}>ADMIN</span>}
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim, marginTop: 2 }}>{shortAddr(u.walletAddress)} · joined {fmtDate(u.createdAt)}</div>
+            </div>
+            <div style={{ display: "flex", gap: 16, fontFamily: MONO, fontSize: 11, color: C.inkSoft, flexWrap: "wrap" }}>
+              <span>{u._count.requests} cases</span>
+              <span>{u._count.votes} votes</span>
+              <span style={{ color: C.lemonDeep }}>gave {fmtMoney(u.totalDonated)}</span>
+              <span style={{ color: C.green }}>got {fmtMoney(u.totalReceived)}</span>
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ─── Admin: Donations ─────────────────────────────────────────────────────
+function AdminDonations() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getAdminDonations()
+      .then(({ donations }) => setRows(donations))
+      .catch(e => toast.error(e.message || "Failed to load donations"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p style={{ color: C.inkDim, fontFamily: SANS, fontSize: 13 }}>Loading...</p>;
+  if (rows.length === 0) return <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No donations recorded yet.</p>;
+
+  return (
+    <div>
+      {rows.map(d => (
+        <Card key={d.id} style={{ padding: "14px 18px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: C.ink }}>{d.donor?.name || shortAddr(d.donorWalletAddress)}</div>
+            <div style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim, marginTop: 2 }}>
+              {shortAddr(d.donorWalletAddress)} · {fmtDate(d.createdAt)}{d.txHash ? ` · tx ${d.txHash.slice(0, 10)}…` : ""}
+            </div>
+          </div>
+          <div style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 500, color: C.lemonDeep, whiteSpace: "nowrap" }}>+{fmtMoney(d.amount)}</div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ─── Admin: Action Log ───────────────────────────────────────────────────
+function AdminLog() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getAdminLogs()
+      .then(({ logs: l }) => setLogs(l))
+      .catch(e => toast.error(e.message || "Failed to load log"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p style={{ color: C.inkDim, fontFamily: SANS, fontSize: 13 }}>Loading...</p>;
+  if (logs.length === 0) return <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No admin actions yet.</p>;
+
+  return (
+    <div>
+      {logs.map(l => (
+        <Card key={l.id} style={{ padding: "14px 18px", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: l.action === "release" ? C.green : C.red, background: l.action === "release" ? C.greenSoft : C.redSoft, padding: "4px 10px", borderRadius: 100 }}>{l.action}</span>
+            <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim }}>{fmtDate(l.createdAt)}</span>
+          </div>
+          {l.reason && <p style={{ fontFamily: SANS, fontSize: 13, color: C.inkSoft, lineHeight: 1.5, margin: "8px 0 0" }}>{l.reason}</p>}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ─── Admin Dashboard (permanent admin only) ─────────────────────────────────────
+function AdminPanel({ user, onChanged }) {
+  const [section, setSection] = useState("overview");
+  const w = useWidth();
+  const mobile = w < 768;
+  const sections = [["overview", "Overview"], ["cases", "Cases"], ["members", "Members"], ["donations", "Donations"], ["log", "Action Log"]];
+
+  return (
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 860 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: C.lemonDeep, fontWeight: 700, marginBottom: 18, background: C.lemonSoft, padding: "12px 14px", borderRadius: 14, fontFamily: MONO }}>
+        <ShieldCheck size={15} style={{ flexShrink: 0 }} />
+        Permanent admin session · {shortAddr(user?.walletAddress)}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22 }}>
+        {sections.map(([id, label]) => <Pill key={id} active={section === id} onClick={() => setSection(id)}>{label}</Pill>)}
+      </div>
+      {section === "overview" && <AdminOverview setSection={setSection} />}
+      {section === "cases" && <AdminCases onChanged={onChanged} />}
+      {section === "members" && <AdminMembers />}
+      {section === "donations" && <AdminDonations />}
+      {section === "log" && <AdminLog />}
+    </div>
+  );
+}
+
+// ─── Admin: Case Management ───────────────────────────────────────────────
+function AdminCases({ onChanged }) {
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("Passed");
   const [loading, setLoading] = useState(true);
@@ -1138,7 +1304,7 @@ function AdminPanel({ onChanged }) {
   }
 
   return (
-    <div style={{ padding: mobile ? 16 : 28, maxWidth: 800 }}>
+    <div>
       <div style={{ display: "flex", gap: 8, fontSize: 12, color: C.inkSoft, lineHeight: 1.5, marginBottom: 20, background: C.bgSoft, padding: 14, borderRadius: 14, fontFamily: SANS }}>
         <ShieldAlert size={15} style={{ flexShrink: 0, marginTop: 1, color: C.lemonDeep }} />
         Cases that passed the community vote and await a manual payout. Releasing creates a public ledger entry.
@@ -1259,7 +1425,7 @@ function Dashboard({ user, setUser, onLogout, requests, ledger, stats, onSubmitt
               {tab === "ledger" && <LedgerPanel ledger={ledger} />}
               {tab === "categories" && <CategoriesPanel setTab={setTab} />}
               {tab === "profile" && <ProfilePanel user={user} setUser={setUser} />}
-              {tab === "admin" && user?.isAdmin && <AdminPanel onChanged={onDataChanged} />}
+              {tab === "admin" && user?.isAdmin && <AdminPanel user={user} onChanged={onDataChanged} />}
             </motion.div>
           </AnimatePresence>
         </div>

@@ -119,6 +119,22 @@ export async function getLeaderboard() {
 }
 
 // Admin
+export async function getAdminOverview() {
+  return request("/admin/overview");
+}
+
+export async function getAdminUsers() {
+  return request("/admin/users");
+}
+
+export async function getAdminDonations() {
+  return request("/admin/donations");
+}
+
+export async function getAdminLogs() {
+  return request("/admin/logs");
+}
+
 export async function getAdminRequests(status = "Passed") {
   return request(`/admin/requests?status=${status}`);
 }
