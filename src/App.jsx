@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useDisconnect, useSignMessage } from "wagmi";
+import { useAccount, useDisconnect, useSignMessage, useSendTransaction } from "wagmi";
+import { parseEther, isAddress } from "viem";
 import {
   Wallet, MapPin, Upload, Check, ShieldCheck, ArrowRight,
   HeartHandshake, Users, Vote, Landmark, Sparkles, AlertCircle,
   LogOut, Plus, TrendingUp, Menu, X, Edit3,
   Home, BookOpen, BarChart3, User,
   DollarSign, Eye, ThumbsUp, ThumbsDown, ShieldAlert,
+  Gift, MessageCircle, Copy, ExternalLink, Search, Send,
 } from "lucide-react";
 import * as api from "./api";
 import { setToken, getStoredToken } from "./api";
@@ -47,6 +49,14 @@ function normalizeRequest(r, summary, fallbackUser) {
   const owner = r.user || fallbackUser || {};
   const closes = r.votingClosesAt ? new Date(r.votingClosesAt) : null;
   const daysLeft = closes ? Math.max(0, Math.ceil((closes.getTime() - Date.now()) / 86400000)) : null;
+  // Human countdown: hours when under a day, days otherwise.
+  let timeLeft = null;
+  if (closes) {
+    const ms = closes.getTime() - Date.now();
+    if (ms <= 0) timeLeft = "closing";
+    else if (ms < 86400000) timeLeft = `${Math.max(1, Math.ceil(ms / 3600000))}h`;
+    else timeLeft = `${Math.ceil(ms / 86400000)}d`;
+  }
   let evidenceUrls = [];
   try { evidenceUrls = JSON.parse(r.evidenceUrls || "[]"); } catch {}
   return {
@@ -59,6 +69,7 @@ function normalizeRequest(r, summary, fallbackUser) {
     title: r.title,
     status: r.status,
     daysLeft,
+    timeLeft,
     story: r.story,
     amount: r.amountRequested,
     yesVotes: summary?.votesYes ?? 0,
@@ -110,12 +121,12 @@ function CatTag({ cat }) {
   return <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 700, color: C.ink, display: "inline-flex", alignItems: "center", gap: 5, background: C.lemonSoft, padding: "4px 10px", borderRadius: 100 }}><Icon size={11} color={C.lemonDeep} />{catLabel(cat)}</span>;
 }
 
-function StatusPill({ status, daysLeft }) {
+function StatusPill({ status, timeLeft }) {
   const open = status === "Open";
   const good = status === "Passed" || status === "Released";
   const color = open ? C.lemonDeep : good ? C.green : status === "Rejected" ? C.red : C.inkSoft;
   const bg = open ? C.lemonSoft : good ? C.greenSoft : status === "Rejected" ? C.redSoft : C.bgSoft;
-  return <span style={{ fontFamily: MONO, fontSize: 10.5, color, fontWeight: 700, background: bg, padding: "5px 10px", borderRadius: 100, whiteSpace: "nowrap" }}>{open ? `Open · ${daysLeft}d left` : status}</span>;
+  return <span style={{ fontFamily: MONO, fontSize: 10.5, color, fontWeight: 700, background: bg, padding: "5px 10px", borderRadius: 100, whiteSpace: "nowrap" }}>{open ? `Open · ${timeLeft || "—"} left` : status}</span>;
 }
 
 function Pill({ children, active, onClick }) {
@@ -299,6 +310,7 @@ function Sidebar({ tab, setTab, user, onLogout, mobile, open, onClose }) {
     { id: "feed", label: "Feed", icon: Home },
     { id: "votes", label: "Vote", icon: ThumbsUp },
     { id: "submit", label: "New Request", icon: Plus },
+    { id: "donate", label: "Donate", icon: Gift },
     { id: "ledger", label: "Ledger", icon: BookOpen },
     { id: "categories", label: "Categories", icon: BarChart3 },
     { id: "profile", label: "My Profile", icon: User },
@@ -383,6 +395,11 @@ function FeedPanel({ requests, ledger, stats, setTab }) {
   const w = useWidth();
   const mobile = w < 768;
   const activeCount = requests.filter(r => r.status === "Open").length;
+  const [donations, setDonations] = useState([]);
+
+  useEffect(() => {
+    api.getRecentDonations().then(({ donations: d }) => setDonations(d)).catch(() => {});
+  }, []);
 
   return (
     <div style={{ padding: mobile ? 16 : 28, maxWidth: 900 }}>
@@ -411,6 +428,26 @@ function FeedPanel({ requests, ledger, stats, setTab }) {
         </Card>
       </div>
 
+      {donations.length > 0 && (
+        <>
+          <Label>Recent supporters</Label>
+          <div style={{ display: "flex", gap: 10, overflowX: "auto", margin: "12px 0 28px", paddingBottom: 4 }}>
+            {donations.map(d => (
+              <Card key={d.id} style={{ padding: "12px 16px", minWidth: 170, flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: C.lemonSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift size={13} color={C.lemonDeep} /></div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.donor?.name || shortAddr(d.donorWalletAddress)}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim }}>{fmtDate(d.createdAt)}</div>
+                  </div>
+                </div>
+                <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 500, color: C.lemonDeep, marginTop: 8 }}>+{fmtMoney(d.amount)}</div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
       <Label>Recent cases</Label>
       <div style={{ marginTop: 12 }}>
         {requests.length === 0 && <p style={{ color: C.inkDim, fontFamily: SANS, fontSize: 13 }}>No cases filed yet. Be the first to put one on the record.</p>}
@@ -423,7 +460,7 @@ function FeedPanel({ requests, ledger, stats, setTab }) {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                 <span style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 500, color: C.ink }}>{fmtMoney(r.amount)}</span>
-                <StatusPill status={r.status} daysLeft={r.daysLeft} />
+                <StatusPill status={r.status} timeLeft={r.timeLeft} />
               </div>
             </div>
           </Card>
@@ -436,23 +473,34 @@ function FeedPanel({ requests, ledger, stats, setTab }) {
 // ─── Votes Panel ──────────────────────────────────────────────────────────────
 function VotesPanel({ requests, user, onVote }) {
   const [filter, setFilter] = useState("All");
-  const filtered = filter === "All" ? requests : requests.filter(c => c.category === filter);
+  const [query, setQuery] = useState("");
+  const [detailId, setDetailId] = useState(null);
+  const q = query.trim().toLowerCase();
+  const filtered = requests
+    .filter(c => filter === "All" || c.category === filter)
+    .filter(c => !q || `${c.title} ${c.story} ${c.name}`.toLowerCase().includes(q));
+  const detail = requests.find(r => r.id === detailId) || null;
   const w = useWidth();
   const mobile = w < 768;
 
   return (
     <div style={{ padding: mobile ? 16 : 28, maxWidth: 800 }}>
+      <div style={{ position: "relative", marginBottom: 14 }}>
+        <Search size={14} color={C.inkDim} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)" }} />
+        <input placeholder="Search cases by title, story, or name..." value={query} onChange={e => setQuery(e.target.value)} style={{ width: "100%", border: `1.5px solid ${C.line}`, borderRadius: 100, padding: "12px 18px 12px 42px", fontFamily: SANS, fontSize: 13.5, color: C.ink, background: C.card, boxSizing: "border-box", outline: "none" }} />
+      </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
         <Pill active={filter === "All"} onClick={() => setFilter("All")}>All</Pill>
         {CATEGORIES.map(c => <Pill key={c.value} active={filter === c.value} onClick={() => setFilter(c.value)}>{c.label}</Pill>)}
       </div>
-      {filtered.length === 0 && <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No cases in this category yet.</p>}
-      {filtered.map(c => <VoteCardDash key={c.id} c={c} user={user} onVote={onVote} />)}
+      {filtered.length === 0 && <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No matching cases.</p>}
+      {filtered.map(c => <VoteCardDash key={c.id} c={c} user={user} onVote={onVote} onOpen={() => setDetailId(c.id)} />)}
+      <RequestDetailModal c={detail} user={user} onVote={onVote} onClose={() => setDetailId(null)} />
     </div>
   );
 }
 
-function VoteCardDash({ c, user, onVote }) {
+function VoteCardDash({ c, user, onVote, onOpen }) {
   const [busy, setBusy] = useState(false);
   const open = c.status === "Open";
   const isMine = user && c.ownerWallet === (user.walletAddress || "").toLowerCase();
@@ -483,7 +531,7 @@ function VoteCardDash({ c, user, onVote }) {
             <span style={{ display: "flex", alignItems: "center", gap: 3 }}><MapPin size={10} />{c.location}</span>
           </div>
         </div>
-        <StatusPill status={c.status} daysLeft={c.daysLeft} />
+        <StatusPill status={c.status} timeLeft={c.timeLeft} />
       </div>
       <p style={{ fontFamily: SERIF, fontSize: 14.5, color: C.inkSoft, lineHeight: 1.55, fontStyle: "italic", margin: "0 0 16px" }}>"{c.story}"</p>
       <div style={{ display: "flex", gap: mobile ? 14 : 28, marginBottom: 16, flexWrap: "wrap", background: C.bgSoft, padding: 14, borderRadius: 14 }}>
@@ -491,23 +539,20 @@ function VoteCardDash({ c, user, onVote }) {
         <div><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Votes</div><div style={{ fontFamily: SERIF, fontSize: 17, color: C.ink, fontWeight: 500 }}>{c.votesCast}</div></div>
         <div><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Evidence</div><div style={{ fontFamily: SANS, fontSize: 12.5, color: C.ink, fontWeight: 600 }}>{c.evidence}</div></div>
       </div>
-      {open && (
-        <>
-          <VoteBar yes={c.yesVotes} no={c.noVotes} />
-          <div style={{ marginTop: 12 }}>
-            {isMine ? (
-              <div style={{ fontSize: 12.5, color: C.inkDim, fontFamily: MONO }}>This is your request — you can't vote on it.</div>
-            ) : c.userHasVoted ? (
-              <div style={{ fontSize: 12.5, color: C.lemonDeep, fontFamily: MONO, fontWeight: 700 }}>Vote recorded</div>
-            ) : (
-              <div style={{ display: "flex", gap: 10 }}>
-                <Btn variant="accent" size="sm" disabled={busy} onClick={() => vote("Yes")}><ThumbsUp size={13} /> Yes</Btn>
-                <Btn variant="ghost" size="sm" disabled={busy} onClick={() => vote("No")}><ThumbsDown size={13} /> No</Btn>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+      {open && <VoteBar yes={c.yesVotes} no={c.noVotes} />}
+      <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {open && (isMine ? (
+          <span style={{ fontSize: 12.5, color: C.inkDim, fontFamily: MONO }}>This is your request — you can't vote on it.</span>
+        ) : c.userHasVoted ? (
+          <span style={{ fontSize: 12.5, color: C.lemonDeep, fontFamily: MONO, fontWeight: 700 }}>Vote recorded</span>
+        ) : (
+          <>
+            <Btn variant="accent" size="sm" disabled={busy} onClick={() => vote("Yes")}><ThumbsUp size={13} /> Yes</Btn>
+            <Btn variant="ghost" size="sm" disabled={busy} onClick={() => vote("No")}><ThumbsDown size={13} /> No</Btn>
+          </>
+        ))}
+        <Btn variant="soft" size="sm" onClick={onOpen} style={{ marginLeft: "auto" }}><MessageCircle size={13} /> Discussion</Btn>
+      </div>
     </Card>
   );
 }
@@ -607,6 +652,214 @@ function SubmitPanel({ user, onSubmitted, setTab }) {
   );
 }
 
+// ─── Comments ───────────────────────────────────────────────────────────────────
+function CommentThread({ requestId }) {
+  const [comments, setComments] = useState([]);
+  const [text, setText] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  function load() {
+    api.getComments(requestId).then(({ comments: c }) => setComments(c)).catch(() => {});
+  }
+  useEffect(() => { load(); }, [requestId]);
+
+  async function post() {
+    if (!text.trim()) return;
+    setPosting(true);
+    try {
+      await api.addComment(requestId, text.trim());
+      setText("");
+      load();
+    } catch (e) {
+      toast.error(e.message || "Could not post comment");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: C.inkDim, margin: "20px 0 10px" }}>Discussion · {comments.length}</div>
+      {comments.length === 0 && <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.inkDim, margin: "0 0 12px" }}>No comments yet — start the conversation.</p>}
+      {comments.map(cm => (
+        <div key={cm.id} style={{ background: C.bgSoft, borderRadius: 14, padding: "10px 14px", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+            <span style={{ fontFamily: SANS, fontSize: 12, fontWeight: 700, color: C.ink }}>{cm.user?.name || shortAddr(cm.user?.walletAddress)}</span>
+            <span style={{ fontFamily: MONO, fontSize: 10, color: C.inkDim }}>{fmtDate(cm.createdAt)}</span>
+          </div>
+          <div style={{ fontFamily: SANS, fontSize: 13, color: C.inkSoft, lineHeight: 1.5 }}>{cm.body}</div>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <input placeholder="Add a comment..." value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === "Enter") post(); }} style={{ flex: 1, border: `1.5px solid ${C.line}`, borderRadius: 100, padding: "10px 16px", fontFamily: SANS, fontSize: 13, color: C.ink, background: C.bgSoft, outline: "none" }} />
+        <Btn variant="accent" size="sm" onClick={post} disabled={posting || !text.trim()}><Send size={13} /></Btn>
+      </div>
+    </div>
+  );
+}
+
+// ─── Request Detail Modal ──────────────────────────────────────────────────
+function RequestDetailModal({ c, user, onVote, onClose }) {
+  const [busy, setBusy] = useState(false);
+  if (!c) return null;
+  const open = c.status === "Open";
+  const isMine = user && c.ownerWallet === (user.walletAddress || "").toLowerCase();
+
+  async function vote(choice) {
+    setBusy(true);
+    try { await onVote(c.id, choice); toast.success(`Voted ${choice}`); }
+    catch (e) { toast.error(e.message || "Vote failed"); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={c.title || c.name} width={600}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+        <CatTag cat={c.category} />
+        <StatusPill status={c.status} timeLeft={c.timeLeft} />
+      </div>
+      <div style={{ display: "flex", gap: 12, fontSize: 11.5, color: C.inkDim, fontFamily: MONO, flexWrap: "wrap", marginBottom: 14 }}>
+        <span>{c.name}</span>
+        <span>payout → {c.wallet}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 3 }}><MapPin size={10} />{c.location}</span>
+      </div>
+      <p style={{ fontFamily: SERIF, fontSize: 15, color: C.inkSoft, lineHeight: 1.6, fontStyle: "italic", margin: "0 0 16px" }}>"{c.story}"</p>
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", background: C.bgSoft, padding: 14, borderRadius: 14, marginBottom: 16 }}>
+        <div><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Requested</div><div style={{ fontFamily: SERIF, fontSize: 18, color: C.ink, fontWeight: 500 }}>{fmtMoney(c.amount)}</div></div>
+        <div><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Votes</div><div style={{ fontFamily: SERIF, fontSize: 18, color: C.ink, fontWeight: 500 }}>{c.votesCast}</div></div>
+        {c.txHash && <div style={{ minWidth: 0 }}><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Tx hash</div><div style={{ fontFamily: MONO, fontSize: 11.5, color: C.ink, wordBreak: "break-all" }}>{c.txHash}</div></div>}
+      </div>
+      {c.evidenceUrls.length > 0 && (
+        <>
+          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: C.inkDim, marginBottom: 8 }}>Evidence · {c.evidenceUrls.length}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+            {c.evidenceUrls.map((u, i) => (
+              <a key={u} href={u} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 11.5, color: C.lemonDeep, fontWeight: 700, background: C.lemonSoft, padding: "7px 12px", borderRadius: 100, textDecoration: "none" }}>
+                <ExternalLink size={11} /> File {i + 1}
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+      {open && (
+        <>
+          <VoteBar yes={c.yesVotes} no={c.noVotes} />
+          <div style={{ marginTop: 12 }}>
+            {isMine ? (
+              <span style={{ fontSize: 12.5, color: C.inkDim, fontFamily: MONO }}>This is your request — you can't vote on it.</span>
+            ) : c.userHasVoted ? (
+              <span style={{ fontSize: 12.5, color: C.lemonDeep, fontFamily: MONO, fontWeight: 700 }}>Vote recorded</span>
+            ) : (
+              <div style={{ display: "flex", gap: 10 }}>
+                <Btn variant="accent" size="sm" disabled={busy} onClick={() => vote("Yes")}><ThumbsUp size={13} /> Yes</Btn>
+                <Btn variant="ghost" size="sm" disabled={busy} onClick={() => vote("No")}><ThumbsDown size={13} /> No</Btn>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      <CommentThread requestId={c.id} />
+    </Modal>
+  );
+}
+
+// ─── Donate Panel ─────────────────────────────────────────────────────────────
+function DonatePanel({ onDonated }) {
+  const [amount, setAmount] = useState("");
+  const [ethAmount, setEthAmount] = useState("");
+  const [txHash, setTxHash] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [recent, setRecent] = useState([]);
+  const { sendTransactionAsync } = useSendTransaction();
+  const poolWallet = import.meta.env.VITE_POOL_WALLET || "";
+  const hasPoolWallet = isAddress(poolWallet);
+  const w = useWidth();
+  const mobile = w < 768;
+
+  function loadRecent() {
+    api.getRecentDonations().then(({ donations }) => setRecent(donations)).catch(() => {});
+  }
+  useEffect(() => { loadRecent(); }, []);
+
+  // Optional on-chain step: send ETH to the pool wallet and attach the tx hash.
+  async function sendOnChain() {
+    if (!ethAmount || parseFloat(ethAmount) <= 0) { toast.error("Enter a valid ETH amount"); return; }
+    setSending(true);
+    try {
+      const hash = await sendTransactionAsync({ to: poolWallet, value: parseEther(ethAmount) });
+      setTxHash(hash);
+      toast.success("Transaction sent — hash attached below");
+    } catch (e) {
+      toast.error(e.shortMessage || e.message || "Transaction failed");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function confirm() {
+    if (!amount || parseFloat(amount) <= 0) { toast.error("Enter a valid amount"); return; }
+    setBusy(true);
+    try {
+      await api.confirmDonation(parseFloat(amount), txHash.trim() || null);
+      toast.success("Thank you — donation recorded");
+      setAmount(""); setEthAmount(""); setTxHash("");
+      loadRecent();
+      await onDonated();
+    } catch (e) {
+      toast.error(e.message || "Donation failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: mobile ? 16 : 28, maxWidth: 560 }}>
+      <Card style={{ padding: mobile ? 20 : 28, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 8, fontSize: 12, color: C.inkSoft, lineHeight: 1.5, marginBottom: 22, background: C.bgSoft, padding: 14, borderRadius: 14, fontFamily: SANS }}>
+          <Gift size={15} style={{ flexShrink: 0, marginTop: 1, color: C.lemonDeep }} />
+          Donations fund the shared pool. Payouts only happen after a community vote and manual admin confirmation.
+        </div>
+        <FieldLabel required>Amount (USD)</FieldLabel>
+        <TextInput placeholder="50" prefix="$" value={amount} onChange={setAmount} />
+        {hasPoolWallet && (
+          <>
+            <FieldLabel>Send on-chain (optional)</FieldLabel>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.bgSoft, borderRadius: 14, padding: "10px 14px", marginBottom: 10 }}>
+              <span style={{ fontFamily: MONO, fontSize: 11.5, color: C.inkSoft, wordBreak: "break-all", flex: 1 }}>{poolWallet}</span>
+              <button onClick={() => { navigator.clipboard.writeText(poolWallet); toast.success("Pool address copied"); }} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.inkSoft, flexShrink: 0 }}><Copy size={13} /></button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}><TextInput placeholder="0.05" prefix="Ξ" value={ethAmount} onChange={setEthAmount} /></div>
+              <Btn variant="ghost" onClick={sendOnChain} disabled={sending}>{sending ? "Sending..." : "Send ETH"}</Btn>
+            </div>
+          </>
+        )}
+        <FieldLabel>Transaction hash (optional)</FieldLabel>
+        <TextInput placeholder="0x..." value={txHash} onChange={setTxHash} />
+        <Btn full variant="accent" onClick={confirm} disabled={busy} style={{ marginTop: 24 }}>{busy ? "Recording..." : <><HeartHandshake size={15} /> Confirm Donation</>}</Btn>
+      </Card>
+
+      {recent.length > 0 && (
+        <>
+          <Label>Recent supporters</Label>
+          <div style={{ marginTop: 10 }}>
+            {recent.map(d => (
+              <Card key={d.id} style={{ padding: "12px 18px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: C.ink }}>{d.donor?.name || shortAddr(d.donorWalletAddress)}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim }}>{fmtDate(d.createdAt)}</div>
+                </div>
+                <div style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 500, color: C.lemonDeep, whiteSpace: "nowrap" }}>+{fmtMoney(d.amount)}</div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Ledger Panel ─────────────────────────────────────────────────────────────
 function LedgerPanel({ ledger }) {
   const w = useWidth();
@@ -674,7 +927,10 @@ function ProfilePanel({ user, setUser }) {
 
   useEffect(() => {
     api.getMyRequests()
-      .then(({ requests }) => setMyRequests(requests.map(r => normalizeRequest(r, null, user))))
+      .then(async ({ requests }) => {
+        const summaries = await Promise.all(requests.map(r => api.getVoteSummary(r.id).catch(() => null)));
+        setMyRequests(requests.map((r, i) => normalizeRequest(r, summaries[i], user)));
+      })
       .catch(() => {});
   }, []);
 
@@ -728,7 +984,8 @@ function ProfilePanel({ user, setUser }) {
                     <CatTag cat={r.category} />
                     <span style={{ fontFamily: SERIF, fontSize: 14, fontWeight: 500, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</span>
                   </div>
-                  <StatusPill status={r.status} daysLeft={r.daysLeft} />
+                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim, whiteSpace: "nowrap" }}>{r.yesVotes}Y · {r.noVotes}N</span>
+                  <StatusPill status={r.status} timeLeft={r.timeLeft} />
                 </div>
               </Card>
             ))}
@@ -755,16 +1012,17 @@ function ProfilePanel({ user, setUser }) {
 // ─── Admin Panel ──────────────────────────────────────────────────────────────
 function AdminPanel({ onChanged }) {
   const [rows, setRows] = useState([]);
+  const [status, setStatus] = useState("Passed");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [txInputs, setTxInputs] = useState({});
   const w = useWidth();
   const mobile = w < 768;
 
-  async function load() {
+  async function load(s = status) {
     setLoading(true);
     try {
-      const { requests } = await api.getAdminRequests("Passed");
+      const { requests } = await api.getAdminRequests(s);
       setRows(requests);
     } catch (e) {
       toast.error(e.message || "Failed to load");
@@ -772,7 +1030,7 @@ function AdminPanel({ onChanged }) {
       setLoading(false);
     }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(status); }, [status]);
 
   async function release(id) {
     setBusyId(id);
@@ -810,8 +1068,11 @@ function AdminPanel({ onChanged }) {
         <ShieldAlert size={15} style={{ flexShrink: 0, marginTop: 1, color: C.lemonDeep }} />
         Cases that passed the community vote and await a manual payout. Releasing creates a public ledger entry.
       </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+        {["Passed", "Open", "Released", "Rejected"].map(s => <Pill key={s} active={status === s} onClick={() => setStatus(s)}>{s}</Pill>)}
+      </div>
       {loading && <p style={{ color: C.inkDim, fontFamily: SANS, fontSize: 13 }}>Loading...</p>}
-      {!loading && rows.length === 0 && <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>Nothing awaiting release.</p>}
+      {!loading && rows.length === 0 && <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No {status.toLowerCase()} cases.</p>}
       {rows.map(r => (
         <Card key={r.id} style={{ padding: mobile ? 18 : 24, marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
@@ -826,11 +1087,17 @@ function AdminPanel({ onChanged }) {
             <div style={{ fontFamily: SERIF, fontSize: 20, color: C.ink, fontWeight: 500 }}>{fmtMoney(r.amountRequested)}</div>
           </div>
           <p style={{ fontFamily: SERIF, fontSize: 13.5, color: C.inkSoft, lineHeight: 1.5, fontStyle: "italic", margin: "0 0 14px" }}>"{r.story}"</p>
-          <TextInput placeholder="Payout tx hash (optional)" value={txInputs[r.id] || ""} onChange={v => setTxInputs(prev => ({ ...prev, [r.id]: v }))} />
-          <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-            <Btn variant="accent" size="sm" disabled={busyId === r.id} onClick={() => release(r.id)}><Check size={13} /> Release Funds</Btn>
-            <Btn variant="danger" size="sm" disabled={busyId === r.id} onClick={() => reject(r.id)}><X size={13} /> Reject</Btn>
-          </div>
+          {status === "Passed" ? (
+            <>
+              <TextInput placeholder="Payout tx hash (optional)" value={txInputs[r.id] || ""} onChange={v => setTxInputs(prev => ({ ...prev, [r.id]: v }))} />
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <Btn variant="accent" size="sm" disabled={busyId === r.id} onClick={() => release(r.id)}><Check size={13} /> Release Funds</Btn>
+                <Btn variant="danger" size="sm" disabled={busyId === r.id} onClick={() => reject(r.id)}><X size={13} /> Reject</Btn>
+              </div>
+            </>
+          ) : (
+            <StatusPill status={r.status} />
+          )}
         </Card>
       ))}
     </div>
@@ -844,8 +1111,8 @@ function Dashboard({ user, setUser, onLogout, requests, ledger, stats, onSubmitt
   const w = useWidth();
   const mobile = w < 900;
 
-  const titles = { feed: "Dashboard", votes: "Vote on Cases", submit: "New Request", ledger: "Public Ledger", categories: "Categories", profile: "My Profile", admin: "Admin — Releases" };
-  const subtitles = { feed: `Welcome back, ${user?.name?.split(" ")[0]}`, votes: "One wallet, one vote — always", submit: "Put your case on the record", ledger: "Every payout confirmed by hand", categories: "Whatever kind of trouble it is", profile: "Manage your account", admin: "Confirm and release passed cases" };
+  const titles = { feed: "Dashboard", votes: "Vote on Cases", submit: "New Request", donate: "Donate to the Pool", ledger: "Public Ledger", categories: "Categories", profile: "My Profile", admin: "Admin — Releases" };
+  const subtitles = { feed: `Welcome back, ${user?.name?.split(" ")[0]}`, votes: "One wallet, one vote — always", submit: "Put your case on the record", donate: "Every dollar goes to someone the community voted in", ledger: "Every payout confirmed by hand", categories: "Whatever kind of trouble it is", profile: "Manage your account", admin: "Confirm and release passed cases" };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg }}>
@@ -860,6 +1127,7 @@ function Dashboard({ user, setUser, onLogout, requests, ledger, stats, onSubmitt
               {tab === "feed" && <FeedPanel requests={requests} ledger={ledger} stats={stats} setTab={setTab} />}
               {tab === "votes" && <VotesPanel requests={requests} user={user} onVote={onVote} />}
               {tab === "submit" && <SubmitPanel user={user} onSubmitted={onSubmitted} setTab={setTab} />}
+              {tab === "donate" && <DonatePanel onDonated={onDataChanged} />}
               {tab === "ledger" && <LedgerPanel ledger={ledger} />}
               {tab === "categories" && <CategoriesPanel setTab={setTab} />}
               {tab === "profile" && <ProfilePanel user={user} setUser={setUser} />}

@@ -36,5 +36,20 @@ export default function donationRoutes(prisma) {
     }
   });
 
+  // GET /donations/recent — public supporters wall (latest 10)
+  router.get("/recent", async (req, res) => {
+    try {
+      const donations = await prisma.donation.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: { donor: { select: { name: true } } },
+      });
+      res.json({ donations });
+    } catch (err) {
+      console.error("recent donations error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   return router;
 }

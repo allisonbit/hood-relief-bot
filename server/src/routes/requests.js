@@ -187,5 +187,42 @@ export default function requestRoutes(prisma) {
     }
   });
 
+  // GET /requests/:id/comments — public discussion thread
+  router.get("/:id/comments", async (req, res) => {
+    try {
+      const comments = await prisma.comment.findMany({
+        where: { requestId: req.params.id },
+        include: { user: { select: { name: true, walletAddress: true } } },
+        orderBy: { createdAt: "asc" },
+      });
+      res.json({ comments });
+    } catch (err) {
+      console.error("list comments error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // POST /requests/:id/comments — add a comment
+  router.post("/:id/comments", authenticate, async (req, res) => {
+    try {
+      const { body } = req.body;
+      if (!body || !body.trim()) return res.status(400).json({ error: "Comment cannot be empty" });
+      if (body.trim().length > 1000) return res.status(400).json({ error: "Comment too long (max 1000 chars)" });
+
+      const request = await prisma.request.findUnique({ where: { id: req.params.id } });
+      if (!request) return res.status(404).json({ error: "Request not found" });
+
+      const comment = await prisma.comment.create({
+        data: { requestId: req.params.id, userId: req.userId, body: body.trim() },
+        include: { user: { select: { name: true, walletAddress: true } } },
+      });
+
+      res.status(201).json({ comment });
+    } catch (err) {
+      console.error("add comment error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   return router;
 }

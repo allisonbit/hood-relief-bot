@@ -87,6 +87,15 @@ export async function getVoteSummary(requestId) {
   return request(`/requests/${requestId}/votes/summary`);
 }
 
+// Comments
+export async function getComments(requestId) {
+  return request(`/requests/${requestId}/comments`);
+}
+
+export async function addComment(requestId, body) {
+  return request(`/requests/${requestId}/comments`, { method: "POST", body: { body } });
+}
+
 // Ledger & Pool
 export async function getLedger(page = 1) {
   return request(`/ledger?page=${page}`);
@@ -99,6 +108,10 @@ export async function getPoolStats() {
 // Donations
 export async function confirmDonation(amount, txHash) {
   return request("/donations/confirm", { method: "POST", body: { amount, txHash } });
+}
+
+export async function getRecentDonations() {
+  return request("/donations/recent");
 }
 
 // Admin
