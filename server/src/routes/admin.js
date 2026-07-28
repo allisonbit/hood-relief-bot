@@ -118,6 +118,16 @@ export default function adminRoutes(prisma) {
         return res.status(400).json({ error: `Cannot release a request with status: ${request.status}` });
       }
 
+      // Never release more than the pool actually holds
+      const [donated, released] = await Promise.all([
+        prisma.donation.aggregate({ _sum: { amount: true } }),
+        prisma.ledgerEntry.aggregate({ _sum: { amount: true } }),
+      ]);
+      const poolBalance = (donated._sum.amount || 0) - (released._sum.amount || 0);
+      if (request.amountRequested > poolBalance) {
+        return res.status(400).json({ error: `Insufficient pool balance: $${poolBalance.toLocaleString()} available, $${request.amountRequested.toLocaleString()} requested` });
+      }
+
       // Wrap in transaction
       const [updated, ledger] = await prisma.$transaction([
         prisma.request.update({

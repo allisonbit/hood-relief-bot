@@ -4,6 +4,7 @@ import { uploadMultiple } from "../utils/upload.js";
 
 const VALID_CATEGORIES = ["Medical", "CryptoLoss", "Disaster", "JobLoss", "Other"];
 const VOTING_WINDOW_DAYS = 5;
+const JWT_SECRET = process.env.JWT_SECRET || "hood-relief-dev-secret";
 
 export default function requestRoutes(prisma) {
   const router = Router();
@@ -173,7 +174,7 @@ export default function requestRoutes(prisma) {
       if (header && header.startsWith("Bearer ")) {
         try {
           const jwt = await import("jsonwebtoken");
-          const payload = jwt.default.verify(header.slice(7), process.env.JWT_SECRET);
+          const payload = jwt.default.verify(header.slice(7), JWT_SECRET);
           const existing = await prisma.vote.findUnique({
             where: { requestId_voterId: { requestId, voterId: payload.userId } },
           });
