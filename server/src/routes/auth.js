@@ -2,6 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
 import { verifyMessage } from "viem";
+import { isAdminWallet } from "../config.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "hood-relief-dev-secret";
 
@@ -78,18 +79,25 @@ export default function authRoutes(prisma) {
         data: { used: true },
       });
 
-      // Find or create user — first wallet ever becomes admin
+      // Admin is determined SOLELY by exact match against the permanent
+      // ADMIN_WALLET — never by connection order. The DB flag is re-synced on
+      // every login so no other wallet can ever hold admin.
+      const shouldBeAdmin = isAdminWallet(addr);
       let user = await prisma.user.findUnique({ where: { walletAddress: addr } });
       if (!user) {
-        const userCount = await prisma.user.count();
         user = await prisma.user.create({
           data: {
             walletAddress: addr,
-            isAdmin: userCount === 0, // first user = admin
+            isAdmin: shouldBeAdmin,
           },
         });
-        if (user.isAdmin) console.log(`[Auth] First user — ${addr} is now admin`);
+      } else if (user.isAdmin !== shouldBeAdmin) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { isAdmin: shouldBeAdmin },
+        });
       }
+      if (shouldBeAdmin) console.log(`[Auth] Permanent admin signed in: ${addr}`);
 
       // Issue JWT
       const token = jwt.sign(

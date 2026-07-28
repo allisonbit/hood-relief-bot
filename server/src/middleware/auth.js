@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { isAdminWallet } from "../config.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "hood-relief-dev-secret";
 
@@ -19,7 +20,10 @@ export function authenticate(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (!req.user?.isAdmin) {
+  // Admin access is granted SOLELY to the permanent ADMIN_WALLET,
+  // independent of any database flag.
+  const wallet = req.walletAddress || req.user?.walletAddress;
+  if (!isAdminWallet(wallet)) {
     return res.status(403).json({ error: "Admin access required" });
   }
   next();
