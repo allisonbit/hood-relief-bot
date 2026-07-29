@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate, attachUser, requireAdmin } from "../middleware/auth.js";
+import { closeExpiredVoting } from "../lib/voting.js";
 
 export default function adminRoutes(prisma) {
   const router = Router();
@@ -96,6 +97,7 @@ export default function adminRoutes(prisma) {
   // GET /admin/requests?status=Passed — list requests awaiting release
   router.get("/requests", async (req, res) => {
     try {
+      await closeExpiredVoting(prisma).catch(() => {});
       const { status = "Passed" } = req.query;
       const requests = await prisma.request.findMany({
         where: { status },

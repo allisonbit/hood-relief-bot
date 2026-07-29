@@ -2,9 +2,11 @@
 // (e.g. https://your-backend.onrender.com). Defaults to the local dev proxy.
 const API = import.meta.env.VITE_API_URL || "/api";
 
-// Base origin for uploaded files (/uploads/...) when the API lives elsewhere.
+// Resolves a stored file reference to a usable URL. Uploads are stored as
+// absolute Vercel Blob URLs, so they are returned unchanged.
 export function fileUrl(p) {
   if (!p) return p;
+  if (/^https?:\/\//i.test(p)) return p;
   try {
     return import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).origin + p : p;
   } catch {

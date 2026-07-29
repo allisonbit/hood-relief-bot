@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate, attachUser } from "../middleware/auth.js";
-import { uploadSingle } from "../utils/upload.js";
+import { uploadSingle, putFile } from "../utils/upload.js";
 
 export default function userRoutes(prisma) {
   const router = Router();
@@ -38,7 +38,12 @@ export default function userRoutes(prisma) {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-      const photoUrl = `/uploads/${req.file.filename}`;
+      let photoUrl;
+      try {
+        photoUrl = await putFile(req.file);
+      } catch {
+        return res.status(500).json({ error: "Upload failed" });
+      }
       const user = await prisma.user.update({
         where: { id: req.userId },
         data: { photoUrl },

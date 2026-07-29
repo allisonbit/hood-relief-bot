@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticate, attachUser } from "../middleware/auth.js";
-import { uploadMultiple } from "../utils/upload.js";
+import { uploadMultiple, putFile } from "../utils/upload.js";
+import { closeExpiredVoting } from "../lib/voting.js";
 
 const VALID_CATEGORIES = ["Medical", "CryptoLoss", "Disaster", "JobLoss", "Other"];
 const VOTING_WINDOW_DAYS = 5;
@@ -53,6 +54,7 @@ export default function requestRoutes(prisma) {
   // GET /requests — list requests with optional filters
   router.get("/", async (req, res) => {
     try {
+      await closeExpiredVoting(prisma).catch(() => {});
       const { status, category, page = 1, limit = 20 } = req.query;
       const where = {};
       if (status) where.status = status;
@@ -117,7 +119,7 @@ export default function requestRoutes(prisma) {
       if (request.userId !== req.userId) return res.status(403).json({ error: "Not your request" });
 
       const existing = JSON.parse(request.evidenceUrls || "[]");
-      const newUrls = req.files.map(f => `/uploads/${f.filename}`);
+      const newUrls = await Promise.all(req.files.map(putFile));
       const all = [...existing, ...newUrls];
 
       const updated = await prisma.request.update({
@@ -163,6 +165,7 @@ export default function requestRoutes(prisma) {
   // GET /requests/:id/votes/summary
   router.get("/:id/votes/summary", async (req, res) => {
     try {
+      await closeExpiredVoting(prisma).catch(() => {});
       const requestId = req.params.id;
       const [votesYes, votesNo] = await Promise.all([
         prisma.vote.count({ where: { requestId, choice: "Yes" } }),
