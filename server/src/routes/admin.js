@@ -94,6 +94,24 @@ export default function adminRoutes(prisma) {
     }
   });
 
+  // GET /admin/flags — community reports awaiting review
+  router.get("/flags", async (req, res) => {
+    try {
+      const flags = await prisma.flag.findMany({
+        include: {
+          user: { select: { name: true, walletAddress: true } },
+          request: { select: { id: true, title: true, status: true, category: true, amountRequested: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+      res.json({ flags });
+    } catch (err) {
+      console.error("admin flags error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // GET /admin/requests?status=Passed — list requests awaiting release
   router.get("/requests", async (req, res) => {
     try {

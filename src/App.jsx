@@ -93,6 +93,7 @@ function normalizeRequest(r, summary, fallbackUser) {
     noVotes: summary?.votesNo ?? 0,
     votesCast: summary?.votesCast ?? 0,
     userHasVoted: summary?.userHasVoted ?? false,
+    quorum: summary?.quorum ?? 3,
     evidence: evidenceUrls.length ? `${evidenceUrls.length} file${evidenceUrls.length > 1 ? "s" : ""}` : "None",
     evidenceUrls,
     txHash: r.transactionHash,
@@ -611,6 +612,11 @@ function VoteCardDash({ c, user, onVote, onOpen }) {
         <div><div style={{ fontFamily: MONO, fontSize: 9.5, color: C.inkDim, textTransform: "uppercase", marginBottom: 4 }}>Evidence</div><div style={{ fontFamily: SANS, fontSize: 12.5, color: C.ink, fontWeight: 600 }}>{c.evidence}</div></div>
       </div>
       {open && <VoteBar yes={c.yesVotes} no={c.noVotes} />}
+      {open && (
+        <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: c.votesCast >= c.quorum ? C.green : C.inkDim, marginTop: 6 }}>
+          {c.votesCast >= c.quorum ? "✓ Quorum met" : `Needs ${c.quorum - c.votesCast} more vote${c.quorum - c.votesCast > 1 ? "s" : ""} to qualify`}
+        </div>
+      )}
       <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         {open && (isMine ? (
           <span style={{ fontSize: 12.5, color: C.inkDim, fontFamily: MONO }}>This is your request — you can't vote on it.</span>
@@ -724,7 +730,7 @@ function SubmitPanel({ user, onSubmitted, setTab }) {
 }
 
 // ─── Comments ───────────────────────────────────────────────────────────────────
-function CommentThread({ requestId }) {
+function CommentThread({ requestId, ownerWallet }) {
   const [comments, setComments] = useState([]);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
@@ -755,7 +761,10 @@ function CommentThread({ requestId }) {
       {comments.map(cm => (
         <div key={cm.id} style={{ background: C.bgSoft, borderRadius: 14, padding: "10px 14px", marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
-            <span style={{ fontFamily: SANS, fontSize: 12, fontWeight: 700, color: C.ink }}>{cm.user?.name || shortAddr(cm.user?.walletAddress)}</span>
+            <span style={{ fontFamily: SANS, fontSize: 12, fontWeight: 700, color: C.ink }}>
+              {cm.user?.name || shortAddr(cm.user?.walletAddress)}
+              {ownerWallet && cm.user?.walletAddress?.toLowerCase() === ownerWallet && <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: C.lemonDeep, background: C.lemonSoft, padding: "2px 7px", borderRadius: 100, marginLeft: 6 }}>REQUESTER</span>}
+            </span>
             <span style={{ fontFamily: MONO, fontSize: 10, color: C.inkDim }}>{fmtDate(cm.createdAt)}</span>
           </div>
           <div style={{ fontFamily: SANS, fontSize: 13, color: C.inkSoft, lineHeight: 1.5 }}>{cm.body}</div>
@@ -791,6 +800,18 @@ function RequestDetailModal({ c, user, onVote, onClose }) {
         <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
           <Btn variant="soft" size="sm" onClick={() => shareCase(c)}><Copy size={12} /> Share</Btn>
           <a href={xShareUrl(c)} target="_blank" rel="noreferrer"><Btn variant="soft" size="sm"><ExternalLink size={12} /> Post on X</Btn></a>
+          {user && !isMine && (
+            <Btn variant="danger" size="sm" onClick={async () => {
+              const reason = window.prompt("Why are you reporting this case?");
+              if (!reason || !reason.trim()) return;
+              try {
+                await api.flagRequest(c.id, reason.trim());
+                toast.success("Reported — the admin will review it");
+              } catch (e) {
+                toast.error(e.message || "Report failed");
+              }
+            }}><ShieldAlert size={12} /> Report</Btn>
+          )}
         </span>
       </div>
       <div style={{ display: "flex", gap: 12, fontSize: 11.5, color: C.inkDim, fontFamily: MONO, flexWrap: "wrap", marginBottom: 14 }}>
@@ -819,6 +840,9 @@ function RequestDetailModal({ c, user, onVote, onClose }) {
       {open && (
         <>
           <VoteBar yes={c.yesVotes} no={c.noVotes} />
+          <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: c.votesCast >= c.quorum ? C.green : C.inkDim, marginTop: 6 }}>
+            {c.votesCast >= c.quorum ? "✓ Quorum met" : `Needs ${c.quorum - c.votesCast} more vote${c.quorum - c.votesCast > 1 ? "s" : ""} to qualify`}
+          </div>
           <div style={{ marginTop: 12 }}>
             {isMine ? (
               <span style={{ fontSize: 12.5, color: C.inkDim, fontFamily: MONO }}>This is your request — you can't vote on it.</span>
@@ -833,7 +857,7 @@ function RequestDetailModal({ c, user, onVote, onClose }) {
           </div>
         </>
       )}
-      <CommentThread requestId={c.id} />
+      <CommentThread requestId={c.id} ownerWallet={c.ownerWallet} />
     </Modal>
   );
 }
@@ -997,6 +1021,7 @@ function ProfilePanel({ user, setUser }) {
   const [bio, setBio] = useState(user.bio || "");
   const [saving, setSaving] = useState(false);
   const [myRequests, setMyRequests] = useState([]);
+  const [myVotes, setMyVotes] = useState([]);
   const w = useWidth();
   const mobile = w < 768;
 
@@ -1007,6 +1032,7 @@ function ProfilePanel({ user, setUser }) {
         setMyRequests(requests.map((r, i) => normalizeRequest(r, summaries[i], user)));
       })
       .catch(() => {});
+    api.getMyVotes().then(({ votes }) => setMyVotes(votes)).catch(() => {});
   }, []);
 
   async function handleSave() {
@@ -1061,6 +1087,25 @@ function ProfilePanel({ user, setUser }) {
                   </div>
                   <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.inkDim, whiteSpace: "nowrap" }}>{r.yesVotes}Y · {r.noVotes}N</span>
                   <StatusPill status={r.status} timeLeft={r.timeLeft} />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      {myVotes.length > 0 && (
+        <>
+          <Label>My votes</Label>
+          <div style={{ margin: "10px 0 20px" }}>
+            {myVotes.map(v => (
+              <Card key={v.id} style={{ padding: "12px 18px", marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: v.choice === "Yes" ? C.green : C.red, background: v.choice === "Yes" ? C.greenSoft : C.redSoft, padding: "4px 10px", borderRadius: 100, flexShrink: 0 }}>{v.choice.toUpperCase()}</span>
+                    <span style={{ fontFamily: SERIF, fontSize: 14, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.request?.title}</span>
+                  </div>
+                  <StatusPill status={v.request?.status} />
                 </div>
               </Card>
             ))}
@@ -1225,12 +1270,81 @@ function AdminLog() {
   );
 }
 
+// ─── Admin: Flags ─────────────────────────────────────────────────────────────
+function AdminFlags({ onChanged }) {
+  const [flags, setFlags] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+
+  function load() {
+    api.getAdminFlags()
+      .then(({ flags: f }) => setFlags(f))
+      .catch(e => toast.error(e.message || "Failed to load reports"))
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => { load(); }, []);
+
+  async function rejectCase(id) {
+    setBusyId(id);
+    try {
+      await api.rejectRequest(id, "Removed after community reports");
+      toast.success("Case rejected");
+      load();
+      onChanged();
+    } catch (e) {
+      toast.error(e.message || "Reject failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (loading) return <p style={{ color: C.inkDim, fontFamily: SANS, fontSize: 13 }}>Loading...</p>;
+  if (flags.length === 0) return <p style={{ textAlign: "center", color: C.inkDim, fontFamily: SANS, marginTop: 40 }}>No reports — the community looks healthy.</p>;
+
+  const grouped = {};
+  for (const f of flags) {
+    (grouped[f.request.id] = grouped[f.request.id] || { request: f.request, items: [] }).items.push(f);
+  }
+
+  return (
+    <div>
+      {Object.values(grouped).map(({ request, items }) => (
+        <Card key={request.id} style={{ padding: "16px 20px", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <CatTag cat={request.category} />
+              <span style={{ fontFamily: SERIF, fontSize: 15, fontWeight: 500, color: C.ink }}>{request.title}</span>
+              <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: C.red, background: C.redSoft, padding: "4px 10px", borderRadius: 100 }}>{items.length} report{items.length > 1 ? "s" : ""}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontFamily: SERIF, fontSize: 16, color: C.ink }}>{fmtMoney(request.amountRequested)}</span>
+              <StatusPill status={request.status} />
+            </div>
+          </div>
+          {items.map(f => (
+            <div key={f.id} style={{ background: C.bgSoft, borderRadius: 12, padding: "8px 12px", marginBottom: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: MONO, fontSize: 10, color: C.inkDim, marginBottom: 3 }}>
+                <span>{f.user?.name || shortAddr(f.user?.walletAddress)}</span>
+                <span>{fmtDate(f.createdAt)}</span>
+              </div>
+              <div style={{ fontFamily: SANS, fontSize: 12.5, color: C.inkSoft }}>{f.reason}</div>
+            </div>
+          ))}
+          {request.status !== "Rejected" && request.status !== "Released" && (
+            <Btn variant="danger" size="sm" disabled={busyId === request.id} onClick={() => rejectCase(request.id)} style={{ marginTop: 8 }}><X size={13} /> Reject Case</Btn>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 // ─── Admin Dashboard (permanent admin only) ─────────────────────────────────────
 function AdminPanel({ user, onChanged }) {
   const [section, setSection] = useState("overview");
   const w = useWidth();
   const mobile = w < 768;
-  const sections = [["overview", "Overview"], ["cases", "Cases"], ["members", "Members"], ["donations", "Donations"], ["log", "Action Log"]];
+  const sections = [["overview", "Overview"], ["cases", "Cases"], ["flags", "Flags"], ["members", "Members"], ["donations", "Donations"], ["log", "Action Log"]];
 
   return (
     <div style={{ padding: mobile ? 16 : 28, maxWidth: 860 }}>
@@ -1243,6 +1357,7 @@ function AdminPanel({ user, onChanged }) {
       </div>
       {section === "overview" && <AdminOverview setSection={setSection} />}
       {section === "cases" && <AdminCases onChanged={onChanged} />}
+      {section === "flags" && <AdminFlags onChanged={onChanged} />}
       {section === "members" && <AdminMembers />}
       {section === "donations" && <AdminDonations />}
       {section === "log" && <AdminLog />}

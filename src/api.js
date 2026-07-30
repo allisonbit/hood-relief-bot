@@ -111,6 +111,14 @@ export async function getVoteSummary(requestId) {
   return request(`/requests/${requestId}/votes/summary`);
 }
 
+export async function flagRequest(requestId, reason) {
+  return request(`/requests/${requestId}/flag`, { method: "POST", body: { reason } });
+}
+
+export async function getMyVotes() {
+  return request("/users/me/votes");
+}
+
 // Comments
 export async function getComments(requestId) {
   return request(`/requests/${requestId}/comments`);
@@ -157,6 +165,10 @@ export async function getAdminDonations() {
 
 export async function getAdminLogs() {
   return request("/admin/logs");
+}
+
+export async function getAdminFlags() {
+  return request("/admin/flags");
 }
 
 export async function getAdminRequests(status = "Passed") {

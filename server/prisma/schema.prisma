@@ -27,6 +27,7 @@ model User {
   votes          Vote[]
   donations      Donation[]
   comments       Comment[]
+  flags          Flag[]
   ledgerReleases LedgerEntry[] @relation("ReleasedBy")
   adminActions   AdminActionLog[]
 }
@@ -50,7 +51,20 @@ model Request {
 
   votes           Vote[]
   comments        Comment[]
+  flags           Flag[]
   ledgerEntry     LedgerEntry?
+}
+
+model Flag {
+  id        String   @id @default(uuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@unique([requestId, userId])
 }
 
 model Comment {

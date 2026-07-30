@@ -52,5 +52,21 @@ export default function userRoutes(prisma) {
     });
   });
 
+  // GET /users/me/votes — the member's voting history
+  router.get("/me/votes", authenticate, async (req, res) => {
+    try {
+      const votes = await prisma.vote.findMany({
+        where: { voterId: req.userId },
+        include: { request: { select: { id: true, title: true, status: true, category: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+      res.json({ votes });
+    } catch (err) {
+      console.error("my votes error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   return router;
 }

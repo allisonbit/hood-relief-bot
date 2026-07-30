@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticate, attachUser } from "../middleware/auth.js";
 import { uploadMultiple, putFile } from "../utils/upload.js";
-import { closeExpiredVoting } from "../lib/voting.js";
+import { closeExpiredVoting, VOTE_QUORUM } from "../lib/voting.js";
 
 const VALID_CATEGORIES = ["Medical", "CryptoLoss", "Disaster", "JobLoss", "Other"];
 const VOTING_WINDOW_DAYS = 5;
@@ -185,8 +185,32 @@ export default function requestRoutes(prisma) {
         } catch {}
       }
 
-      res.json({ votesYes, votesNo, votesCast: votesYes + votesNo, userHasVoted });
+      res.json({ votesYes, votesNo, votesCast: votesYes + votesNo, userHasVoted, quorum: VOTE_QUORUM });
     } catch (err) {
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // POST /requests/:id/flag — report a suspicious case to the admin
+  router.post("/:id/flag", authenticate, async (req, res) => {
+    try {
+      const { reason } = req.body;
+      if (!reason || !reason.trim()) return res.status(400).json({ error: "Reason required" });
+
+      const request = await prisma.request.findUnique({ where: { id: req.params.id } });
+      if (!request) return res.status(404).json({ error: "Request not found" });
+      if (request.userId === req.userId) return res.status(400).json({ error: "Cannot report your own request" });
+
+      const flag = await prisma.flag.create({
+        data: { requestId: req.params.id, userId: req.userId, reason: reason.trim().slice(0, 500) },
+      });
+
+      res.status(201).json({ flag });
+    } catch (err) {
+      if (err.code === "P2002") {
+        return res.status(409).json({ error: "You already reported this case" });
+      }
+      console.error("flag error:", err);
       res.status(500).json({ error: "Server error" });
     }
   });
