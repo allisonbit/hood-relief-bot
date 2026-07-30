@@ -130,7 +130,7 @@ export default function adminRoutes(prisma) {
         return res.status(400).json({ error: `Insufficient pool balance: $${poolBalance.toLocaleString()} available, $${request.amountRequested.toLocaleString()} requested` });
       }
 
-      // Wrap in transaction
+      // Atomic: status change, ledger entry and recipient total move together
       const [updated, ledger] = await prisma.$transaction([
         prisma.request.update({
           where: { id: request.id },
@@ -147,13 +147,11 @@ export default function adminRoutes(prisma) {
             payoutTxHash: payoutTxHash || null,
           },
         }),
+        prisma.user.update({
+          where: { id: request.userId },
+          data: { totalReceived: { increment: request.amountRequested } },
+        }),
       ]);
-
-      // Update recipient's totalReceived
-      await prisma.user.update({
-        where: { id: request.userId },
-        data: { totalReceived: { increment: request.amountRequested } },
-      });
 
       // Log action
       await prisma.adminActionLog.create({

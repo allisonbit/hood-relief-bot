@@ -14,20 +14,21 @@ export default function donationRoutes(prisma) {
 
       // If txHash is provided, in production you'd verify on-chain.
       // For now, trust the client since there's no live chain yet.
-      const donation = await prisma.donation.create({
-        data: {
-          donorUserId: req.userId,
-          donorWalletAddress: req.walletAddress,
-          amount: parseFloat(amount),
-          txHash: txHash || null,
-        },
-      });
-
-      // Update user's totalDonated
-      await prisma.user.update({
-        where: { id: req.userId },
-        data: { totalDonated: { increment: parseFloat(amount) } },
-      });
+      // Atomic: the donation row and the donor's running total move together.
+      const [donation] = await prisma.$transaction([
+        prisma.donation.create({
+          data: {
+            donorUserId: req.userId,
+            donorWalletAddress: req.walletAddress,
+            amount: parseFloat(amount),
+            txHash: txHash || null,
+          },
+        }),
+        prisma.user.update({
+          where: { id: req.userId },
+          data: { totalDonated: { increment: parseFloat(amount) } },
+        }),
+      ]);
 
       res.status(201).json({ donation });
     } catch (err) {
